@@ -24,7 +24,8 @@
 
 ## P2 — Artifacts + Music
 
-- [ ] Not started.
+- [x] Historical artifact contract defined (Stage 2A-P1): authored identity, governed digest, source vs archive locator, type vs role, rights, original vs derivative, derived admission state. No importer, manifest, rendering, or fetching yet.
+- [ ] Not otherwise started.
 
 ## P3 — PWA / Offline
 
