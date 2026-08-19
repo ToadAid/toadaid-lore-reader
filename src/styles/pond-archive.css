@@ -45,18 +45,21 @@ body { margin: 0; min-width: 320px; }
   opacity: .4;
   animation: twinkle var(--duration, 6s) var(--delay, 0s) ease-in-out infinite;
 }
-.star:nth-child(1)  { left: 16%; top: 17%; --duration: 5s;   --delay: 0s;   box-shadow: 0 0 6px 1px rgba(190, 238, 202, .55); }
-.star:nth-child(2)  { left: 28%; top: 11%; --duration: 8s;   --delay: 3s;   width: 1px; height: 1px; }
-.star:nth-child(3)  { left: 39%; top: 24%; --duration: 6s;   --delay: 1.5s; }
-.star:nth-child(4)  { left: 58%; top: 9%;  --duration: 4.5s; --delay: 4s;   width: 1px; height: 1px; }
-.star:nth-child(5)  { left: 73%; top: 19%; --duration: 7s;   --delay: 2s; }
-.star:nth-child(6)  { left: 84%; top: 12%; --duration: 5.5s; --delay: 5s;   width: 1px; height: 1px; }
-.star:nth-child(7)  { left: 9%;  top: 31%; --duration: 8.5s; --delay: 1s; }
-.star:nth-child(8)  { left: 92%; top: 34%; --duration: 4s;   --delay: 6s;   width: 1px; height: 1px; }
-.star:nth-child(9)  { left: 47%; top: 15%; --duration: 6.5s; --delay: 2.5s; box-shadow: 0 0 6px 1px rgba(190, 238, 202, .5); }
-.star:nth-child(10) { left: 67%; top: 29%; --duration: 7.5s; --delay: 4.5s; width: 1px; height: 1px; }
-.star:nth-child(11) { left: 23%; top: 26%; --duration: 3.8s; --delay: 3.5s; width: 1px; height: 1px; }
-.star:nth-child(12) { left: 78%; top: 7%;  --duration: 8.8s; --delay: .5s; }
+/* desktop: stars placed only in clear-sky pockets — never across the
+   moon (x40–68, y4–31) nor the central cloud band (y20–44, x20–82).
+   Moon occlusion + cloud avoidance are obeyed by conservative
+   deterministic positioning, not masking. Sparse, irregular, 6L/4R. */
+.star:nth-child(1)  { left: 24%; top: 9%;  --duration: 5s;   --delay: 0s;   box-shadow: 0 0 6px 1px rgba(190, 238, 202, .55); }
+.star:nth-child(2)  { left: 31%; top: 17%; --duration: 8s;   --delay: 3s;   width: 1px; height: 1px; }
+.star:nth-child(3)  { left: 18%; top: 13%; --duration: 6s;   --delay: 1.5s; width: 1px; height: 1px; }
+.star:nth-child(4)  { left: 13%; top: 29%; --duration: 4.5s; --delay: 4s; }
+.star:nth-child(5)  { left: 79%; top: 8%;  --duration: 7s;   --delay: 2s;   box-shadow: 0 0 6px 1px rgba(190, 238, 202, .5); }
+.star:nth-child(6)  { left: 86%; top: 14%; --duration: 5.5s; --delay: 5s;   width: 1px; height: 1px; }
+.star:nth-child(7)  { left: 92%; top: 28%; --duration: 8.5s; --delay: 1s; }
+.star:nth-child(8)  { left: 88%; top: 42%; --duration: 3.8s; --delay: 6s;   width: 1px; height: 1px; }
+.star:nth-child(9)  { left: 7%;  top: 38%; --duration: 6.5s; --delay: 2.5s; width: 1px; height: 1px; }
+.star:nth-child(10) { left: 15%; top: 46%; --duration: 7.5s; --delay: 4.5s; width: 1px; height: 1px; }
+.star:nth-child(11), .star:nth-child(12) { display: none; }
 .enter-archive{margin-top:.85rem;color:#e9f4e9;font-size:.78rem;font-weight:700;letter-spacing:.1em;text-decoration:none;border-bottom:1px solid #82dc9f;padding:.5rem .1rem}.enter-archive span{color:#91e8ae;padding-left:.25rem}
 
 .wordmark {
@@ -102,6 +105,14 @@ body { margin: 0; min-width: 320px; }
   .intro { max-width: 19rem; font-size: .84rem; }
   .source-note { max-width: 15rem; }
   .cover-footnote { display: none; }
+  /* portrait crop: re-tune stars to extreme left/right clear-sky margins,
+     avoiding the upper-center moon/halo, central cloud mass, and title. */
+  .star:nth-child(1) { left: 6%;  top: 8%; }
+  .star:nth-child(2) { left: 11%; top: 19%; }
+  .star:nth-child(3) { left: 8%;  top: 31%; }
+  .star:nth-child(4) { left: 92%; top: 11%; }
+  .star:nth-child(5) { left: 88%; top: 26%; }
+  .star:nth-child(6) { left: 94%; top: 19%; }
   .star:nth-child(n+7){display:none}
 }
 
