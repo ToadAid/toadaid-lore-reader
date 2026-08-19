@@ -6,7 +6,7 @@ import { dirname, resolve } from 'node:path';
 const EXPECTED = Object.freeze({
   repository: 'ToadAid/toadaid.github.io',
   sourcePath: 'lore/data.json',
-  commit: '041c2ea6fda8284f61fb35c7101d083623d235ba',
+  commit: '464933cecb6f508a980a66d37c8a7ef7add2f53d',
 });
 
 function fail(message) { throw new Error(`Canonical lore import refused: ${message}`); }
@@ -94,4 +94,3 @@ async function main() {
 if (import.meta.url === `file://${process.argv[1]}`) {
   main().catch((error) => { console.error(error.message); process.exitCode = 1; });
 }
-

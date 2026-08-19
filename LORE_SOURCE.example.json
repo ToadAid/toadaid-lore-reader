@@ -2,9 +2,8 @@
   "schemaVersion": "1.0.0",
   "repository": "ToadAid/toadaid.github.io",
   "path": "lore/data.json",
-  "commit": "041c2ea6fda8284f61fb35c7101d083623d235ba",
-  "sourceDigest": "sha256:<digest of the exact source bytes>",
+  "commit": "464933cecb6f508a980a66d37c8a7ef7add2f53d",
+  "sourceDigest": "sha256:8635376f18805eb0677cdcfce92e8b63ce8d6f530c1fcab06e4f1348f323f984",
   "recordCount": 130,
   "generatedAt": "2026-08-19T00:00:00.000Z"
 }
-

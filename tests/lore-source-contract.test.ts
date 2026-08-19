@@ -5,7 +5,7 @@ import { buildSnapshot } from '../scripts/import-canonical-lore.mjs';
 const provenance = {
   repository: 'ToadAid/toadaid.github.io',
   path: 'lore/data.json',
-  commit: '041c2ea6fda8284f61fb35c7101d083623d235ba',
+  commit: '464933cecb6f508a980a66d37c8a7ef7add2f53d',
 };
 const generatedAt = '2026-08-19T00:00:00.000Z';
 const shaped = JSON.stringify([
@@ -47,4 +47,3 @@ test('exact provenance binding is retained and invalid provenance fails closed',
   assert.deepEqual({ repository: result.source.repository, path: result.source.path, commit: result.source.commit }, provenance);
   assert.throws(() => build(shaped, { ...provenance, commit: '0000000000000000000000000000000000000000' }), /not bound/);
 });
-
