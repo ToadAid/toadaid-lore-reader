@@ -1,8 +1,54 @@
 ---
-// P0 intentionally has no Reader UI.
+import '../styles/pond-archive.css';
+import { loadArchiveCoverState } from '../lib/lore/archive-cover-state';
+
+const archive = loadArchiveCoverState();
+const verified = archive.status === 'verified';
 ---
+
 <!doctype html>
 <html lang="en">
-  <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width" /><title>ToadAid Lore Reader</title></head>
-  <body><main><h1>ToadAid Lore Reader</h1><p>P0 source foundation.</p></main></body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="description" content="The Lore of Tobyworld — Preserved by ToadAid." />
+    <title>The Pond Archive · ToadAid Lore Reader</title>
+  </head>
+  <body>
+    <main class="archive-cover">
+      <div class="moon" aria-hidden="true"></div>
+      <div class="ripple ripple-one" aria-hidden="true"></div>
+      <div class="ripple ripple-two" aria-hidden="true"></div>
+
+      <nav class="wordmark" aria-label="ToadAid Lore Reader">
+        <span class="wordmark-mark">◉</span>
+        <span>TOADAID</span>
+        <span class="wordmark-divider">/</span>
+        <span>LORE READER</span>
+      </nav>
+
+      <section class="cover-copy" aria-labelledby="archive-title">
+        <p class="eyebrow">A GOVERNED HISTORICAL READER</p>
+        <h1 id="archive-title">THE<br />POND ARCHIVE</h1>
+        <p class="promise">The Lore of Tobyworld <span>—</span> Preserved by ToadAid</p>
+        <p class="intro">A quiet place to read canonical lore, inspect its evidence, and follow every ripple back to its source.</p>
+
+        {verified ? (
+          <section class="archive-state verified-state" aria-label="Verified canonical archive state">
+            <p class="record-count">{archive.recordCount} records preserved</p>
+            <p class="snapshot-status"><span class="status-dot" aria-hidden="true"></span> Canonical snapshot <code aria-label={`Canonical commit ${archive.canonicalCommit}`}>{archive.canonicalCommit.slice(0, 9)}…</code></p>
+          </section>
+        ) : (
+          <p class="snapshot-status unavailable-state"><span class="status-dot" aria-hidden="true"></span> Awaiting a verified canonical snapshot</p>
+        )}
+      </section>
+
+      <aside class="source-note" aria-label="Archive status">
+        <span>◉ CANONICAL ARCHIVE</span>
+        <p>{verified ? `Verified from ${archive.repository}/${archive.path}.` : 'Every chapter will retain its source, canonical identity, chronology marker, and provenance.'}</p>
+      </aside>
+
+      <p class="cover-footnote">THE ARCHIVE IS QUIET. THE LORE CONTINUES.</p>
+    </main>
+  </body>
 </html>
