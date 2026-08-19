@@ -25,6 +25,7 @@
 ## P2 — Artifacts + Music
 
 - [x] Historical artifact contract defined (Stage 2A-P1): authored identity, governed digest, source vs archive locator, type vs role, rights, original vs derivative, derived admission state. No importer, manifest, rendering, or fetching yet.
+- [x] Legacy media candidate manifest generated (Stage 2A-P2): importer emits a provenance-bound `generated/legacy-media-candidates.json` from legacy `img`; deterministic `legacy-img:<id>` candidate keys (NOT artifactIds); REFERENCE_ONLY state; fail-closed validation. No rendering, fetching, or PWA yet.
 - [ ] Not otherwise started.
 
 ## P3 — PWA / Offline

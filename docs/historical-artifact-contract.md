@@ -144,3 +144,42 @@ legacy `img` references point at binaries that exist neither in the canonical
 checkout, nor in reachable Git history, nor live (both URLs return HTTP 404
 HTML). Any future importer must therefore render them as `REFERENCE_ONLY` /
 `MISSING`, never as preserved evidence.
+
+## Generated legacy-media candidate manifest (Stage 2A-P2)
+
+The first DERIVED media layer is a generated, provenance-bound,
+non-authoritative manifest produced by the existing Reader importer from the
+same canonical load as the Reader snapshot:
+
+```text
+canonical data.json -> exact commit -> importer -> reader snapshot + LORE_SOURCE + legacy-media-candidates.json
+```
+
+A legacy `img` reference is NOT yet a `HistoricalArtifact`. The manifest carries
+a deterministic INTERNAL `candidateKey` of the form `legacy-img:<canonicalId>`,
+which is NOT an `artifactId`, does not satisfy the canonical artifact-id
+validator, is not Mirror-citable, and must never become permanent artifact
+identity. If a future human admits the media canonically, that human authors a
+real stable `artifactId` separately.
+
+Each candidate carries: `candidateKey`, `canonicalId`, `legacyField` (`img`),
+`legacyImgReference` (the exact legacy value, byte-for-byte; a legacy
+self-hosted media locator — NOT a verified `sourceUrl` or `archivePath`),
+`type` (`image`), and `state` (`REFERENCE_ONLY`). It deliberately carries NO
+`artifactId`, `expectedSha256`, `archivePath`, or rights metadata: those are
+authored canonical facts no human has governed for these legacy records.
+
+State is derived solely from canonical import truth (no network): legacy `img`
+present + no canonical expected digest -> `REFERENCE_ONLY`. The manifest does
+NOT embed the P0 HTTP 404 observation, because that evidence has not entered
+governed canonical metadata; deriving `MISSING` from a prior network probe
+would make importer output non-deterministic and online.
+
+The manifest is provenance-bound to the same canonical generation as the
+snapshot (repository, path, commit, sourceDigest, recordCount). A manifest from
+generation A is never accepted with a snapshot from generation B. Candidates
+follow canonical snapshot ordering (chronological `sortKey`, then `canonicalId`);
+they are never sorted by URL. An archive with zero non-empty `img` fields
+yields a valid zero-candidate manifest. Generation is deterministic across
+repeated builds from identical canonical input (candidate identity excludes
+`generatedAt`, which is build metadata, not historical identity).
