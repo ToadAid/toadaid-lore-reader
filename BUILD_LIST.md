@@ -11,7 +11,14 @@
 
 ## P1 — Book Reader
 
-- [ ] Not started.
+- [x] Pond Archive cover — implemented with verified generated-snapshot state and an honest unavailable state.
+- [ ] Ripple Chronicle.
+- [ ] Chapter reader.
+- [ ] Evidence Lens.
+- [ ] Progress / continue reading.
+- [ ] Bookmarks.
+- [ ] Original / Commentary / Both.
+- [ ] Appearance / font controls.
 
 ## P2 — Artifacts + Music
 

@@ -1,0 +1,89 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  background: #050907;
+  color: #e8eee8;
+}
+
+* { box-sizing: border-box; }
+
+body { margin: 0; min-width: 320px; }
+
+.archive-cover {
+  isolation: isolate;
+  position: relative;
+  display: grid;
+  min-height: 100svh;
+  overflow: hidden;
+  padding: clamp(1.5rem, 4vw, 4rem);
+  background-color: #030908;
+  background-image:
+    linear-gradient(to bottom, rgba(1, 8, 8, .38), rgba(2, 10, 10, .06) 44%, rgba(1, 8, 8, .34)),
+    radial-gradient(ellipse 68% 54% at 50% 49%, rgba(2, 14, 14, .04), rgba(1, 8, 8, .42) 100%),
+    url('/art/pond-archive/cover-desktop.png');
+  background-position: center, center, center center;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+.archive-cover::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(1, 8, 8, .18), transparent 26%, transparent 74%, rgba(1, 8, 8, .18));
+}
+
+.moon, .ripple { display: none; }
+
+.wordmark {
+  align-self: start;
+  display: flex;
+  gap: .55rem;
+  color: #b8cabd;
+  font-size: .68rem;
+  font-weight: 650;
+  letter-spacing: .17em;
+}
+
+.wordmark-mark, .wordmark-divider { color: #7ee3a4; }
+
+.cover-copy { align-self: center; max-width: 68rem; margin: 5rem auto 2rem; text-align: center; text-shadow: 0 2px 18px rgba(0, 0, 0, .86); }
+.eyebrow, .cover-footnote { color: #a5bca9; font-size: .66rem; font-weight: 650; letter-spacing: .2em; }
+.cover-copy h1 { margin: .8rem 0 1.15rem; color: #f2eee2; font-family: Georgia, 'Times New Roman', serif; font-size: clamp(3.8rem, 10vw, 8.8rem); font-weight: 400; letter-spacing: -.075em; line-height: .78; text-shadow: 0 2px 24px rgba(0, 0, 0, .92), 0 0 40px rgba(158, 232, 181, .14); }
+.promise { margin: 0; color: #edf1e7; font-family: Georgia, 'Times New Roman', serif; font-size: clamp(1rem, 2vw, 1.35rem); font-style: italic; }
+.promise span { color: #7ee3a4; padding: 0 .35rem; }
+.intro { max-width: 31rem; margin: 2rem auto; color: #d1ddd1; font-size: .94rem; line-height: 1.7; }
+.archive-state { display: grid; justify-items: center; gap: .55rem; }
+.record-count { margin: 0; color: #f0eee2; font-family: Georgia, 'Times New Roman', serif; font-size: 1.03rem; font-style: italic; }
+.snapshot-status { margin: 0; color: #c0d2c2; font-size: .72rem; }
+.snapshot-status code { color: #e0e6d9; font-family: ui-monospace, SFMono-Regular, monospace; font-size: .68rem; }
+.unavailable-state { margin-top: .4rem; }
+.status-dot { display: inline-block; width: .4rem; height: .4rem; margin-right: .35rem; border-radius: 50%; background: #c2a55a; box-shadow: 0 0 8px #c2a55a; }
+.source-note { align-self: end; max-width: 19rem; color: #c6d7c8; font-size: .7rem; line-height: 1.55; text-shadow: 0 2px 12px rgba(0, 0, 0, .95); }
+.source-note span { color: #8adcad; font-size: .62rem; font-weight: 700; letter-spacing: .13em; }
+.source-note p { margin: .5rem 0 0; }
+.cover-footnote { position: absolute; right: clamp(1.5rem, 4vw, 4rem); bottom: clamp(1.5rem, 4vw, 4rem); margin: 0; font-size: .55rem; opacity: .58; }
+
+@media (max-width: 640px) {
+  .archive-cover {
+    padding: 1.5rem;
+    background-image:
+      linear-gradient(to bottom, rgba(1, 8, 8, .2), rgba(2, 10, 10, .03) 38%, rgba(1, 8, 8, .48)),
+      radial-gradient(ellipse 94% 54% at 50% 48%, rgba(2, 14, 14, .02), rgba(1, 8, 8, .4) 100%),
+      url('/art/pond-archive/cover-mobile.png');
+    background-position: center, center, center center;
+  }
+  .cover-copy { margin-top: 4rem; max-width: 24rem; }
+  .cover-copy h1 { font-size: clamp(3.4rem, 16vw, 5.4rem); }
+  .intro { max-width: 19rem; font-size: .84rem; }
+  .source-note { max-width: 15rem; }
+  .cover-footnote { display: none; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ripple-one { animation: breathe 8s ease-in-out infinite; }
+  .ripple-two { animation: breathe 8s 1.2s ease-in-out infinite reverse; }
+}
+
+@keyframes breathe { 50% { opacity: .48; transform: translateX(-50%) scale(1.025); } }
