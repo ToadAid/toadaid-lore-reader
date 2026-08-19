@@ -12,9 +12,11 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
 .reader-shell, .chapter-shell { min-height: 100svh; padding: clamp(1.25rem, 4vw, 4rem); }
 .reader-header { display: flex; justify-content: space-between; gap: 1rem; color: #a6c4ad; font-size: .7rem; font-weight: 700; letter-spacing: .14em; }
 .reader-header a { text-decoration: none; }
+
+/* ───────────────────────── Chronicle index ───────────────────────── */
 .chronicle-intro, .unavailable { max-width: 46rem; margin: 8rem auto 4rem; text-align: center; }
 .kicker, .canonical-id { color: #8be0ac; font-size: .7rem; letter-spacing: .14em; }
-.chronicle-intro h1, article h1 { font: 400 clamp(3rem, 7vw, 6rem)/.95 Georgia, serif; margin: .6rem 0; overflow-wrap: anywhere; }
+.chronicle-intro h1, .chapter-article h1 { font: 400 clamp(3rem, 7vw, 6rem)/.95 Georgia, serif; margin: .6rem 0; overflow-wrap: anywhere; }
 .chronicle-intro p { color: #b5c9b9; }
 .chronicle { max-width: 52rem; margin: auto; }
 .year-group { border-left: 1px solid #386555; padding: 0 0 2rem 1.5rem; }
@@ -26,24 +28,124 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
 .year-group a:hover { background: rgba(126, 227, 164, .08); }
 time, small { color: #a6bca9; font-size: .75rem; }
 .year-group span { color: #edf2ec; font: 1.2rem Georgia, serif; overflow-wrap: anywhere; }
-.chapter-shell article { max-width: 47rem; margin: 6rem auto; }
-.chapter-shell h1 { font-size: clamp(2.7rem, 7vw, 5.2rem); }
-.canonical-id { margin: 1.5rem 0; overflow-wrap: anywhere; }
-.source-link, button { border: 1px solid #497963; border-radius: .25rem; background: rgba(10, 29, 22, .75); padding: .55rem .75rem; }
-.source-link { text-decoration: none; }
-.mode-controls { display: flex; flex-wrap: wrap; gap: .5rem; margin: 2.5rem 0 1.5rem; }
-.mode-controls button { color: #dce8dd; cursor: pointer; }
-.mode-controls button[aria-pressed=true] { border-color: #9be9ba; background: #1e4936; }
-article section { margin: 2.5rem 0; }
-article h2, .evidence h2 { color: #9be9ba; font-size: .78rem; letter-spacing: .16em; text-transform: uppercase; }
-pre { color: #e8eee7; font: 1rem/1.75 Georgia, serif; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* ───────────────────────── Chapter reading surface ───────────────────────── */
+.chapter-article { max-width: 50rem; margin: 5rem auto; }
+.chapter-article > h1 { font-size: clamp(2.4rem, 7vw, 4.6rem); }
+.canonical-id { margin: 1.25rem 0; overflow-wrap: anywhere; }
+
+.source-link {
+  display: inline-block;
+  border: 1px solid #497963;
+  border-radius: .25rem;
+  background: rgba(10, 29, 22, .75);
+  padding: .5rem .7rem;
+  text-decoration: none;
+  font-size: .82rem;
+}
+.source-link--top { margin: .5rem 0 1rem; }
+
+/* reading-mode controls */
+.mode-controls { display: flex; flex-wrap: wrap; gap: .5rem; margin: 2.25rem 0 2rem; }
+.mode-controls button {
+  border: 1px solid #497963;
+  border-radius: .25rem;
+  background: rgba(10, 29, 22, .75);
+  padding: .55rem .85rem;
+  color: #dce8dd;
+  font: inherit;
+  font-size: .82rem;
+  cursor: pointer;
+}
+.mode-controls button[aria-pressed='true'] { border-color: #9be9ba; background: #1e4936; }
+
+/* folio shared typography (rendered Markdown) */
+.folio-body { font: 1.0625rem/1.75 Georgia, serif; }
+.folio-body > :first-child { margin-top: 0; }
+.folio-body > :last-child { margin-bottom: 0; }
+.folio-body h3 {
+  color: #9be9ba;
+  font: 400 1.35rem/1.3 Georgia, serif;
+  letter-spacing: .01em;
+  margin: 2rem 0 .75rem;
+}
+.folio-body h3:first-child { margin-top: 0; }
+.folio-body h4 { color: #bfe9cf; font: 400 1.1rem/1.35 Georgia, serif; margin: 1.5rem 0 .5rem; }
+.folio-body h5, .folio-body h6 { color: #c7dccc; font: 600 1rem/1.4 Georgia, serif; margin: 1.25rem 0 .5rem; }
+.folio-body p { margin: 0 0 1.1rem; }
+.folio-body ul { margin: 0 0 1.25rem; padding-left: 1.4rem; }
+.folio-body li { margin: 0 0 .45rem; }
+.folio-body li::marker { color: #5f9a78; }
+.folio-body li > ul { margin: .5rem 0 0; }
+.folio-body strong { color: #f4f8f2; font-weight: 600; }
+.folio-body em { font-style: italic; }
+.folio-body code {
+  font: .92em/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: #bfe9cf;
+  background: rgba(126, 227, 164, .1);
+  border-radius: .25rem;
+  padding: .12em .34em;
+}
+.folio-body a { color: #a6e5be; }
+.folio-body a:hover { text-decoration: underline; }
+.folio-body hr { border: 0; border-top: 1px solid #234337; margin: 1.75rem 0; }
+/* keep long URLs and code from forcing horizontal overflow */
+.folio-body a, .folio-body code { overflow-wrap: anywhere; word-break: break-word; }
+
+/* Original Record folio — restrained archival source panel (primary evidence) */
+.original-folio {
+  background: linear-gradient(180deg, #0b1c17 0%, #0a1714 100%);
+  border: 1px solid #2f5d49;
+  border-radius: 3px;
+  padding: clamp(1.5rem, 4vw, 2.25rem);
+  margin: 0 0 2.5rem;
+  box-shadow: inset 0 1px 0 rgba(126, 227, 164, .05);
+}
+.original-folio .folio-body--source { color: #e8eee7; }
+.original-folio .folio-body blockquote {
+  margin: 1.1rem 0;
+  padding: .15rem 0 .15rem 1.15rem;
+  border-left: 2px solid #2f5d49;
+  color: #d8e2d8;
+}
+.original-folio .folio-body blockquote > p { margin: 0 0 .65rem; }
+.original-folio .folio-body blockquote > p:last-child { margin-bottom: 0; }
+.folio-source { margin: 1.5rem 0 0; }
+
+/* Commentary folio — subordinate archival reading panel */
+.commentary-folio {
+  background: #08130f;
+  border: 1px solid #1f3f33;
+  border-radius: 3px;
+  padding: clamp(1.25rem, 4vw, 2rem);
+  margin: 0 0 2.5rem;
+}
+.commentary-folio .folio-body--commentary { color: #cfd8cf; }
+.commentary-folio .folio-body h3 { color: #8fd3aa; }
+.commentary-folio .folio-body hr { border-top-color: #1f3f33; }
+
+/* folio labels — restrained, typographic rather than loud */
+.folio-label {
+  color: #9be9ba;
+  font: 700 .7rem/1 Inter, ui-sans-serif, system-ui;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  margin: 0 0 1.25rem;
+}
+.folio-label--muted { color: #7fa892; }
+
+/* Evidence Lens — stays separate, below the reading folios */
 .evidence { border-top: 1px solid #315544; border-bottom: 1px solid #315544; margin-top: 3rem; padding: 1rem 0; }
 .evidence summary { color: #a6e5be; cursor: pointer; font-weight: 700; }
+.evidence h2 { color: #9be9ba; font-size: .78rem; letter-spacing: .16em; text-transform: uppercase; margin: 1.25rem 0 .5rem; }
 .evidence dl { display: grid; grid-template-columns: 10rem minmax(0, 1fr); gap: .45rem 1rem; font-size: .88rem; }
 .evidence dt { color: #9fbaaa; }
 .evidence dd { min-width: 0; margin: 0; }
 .break { overflow-wrap: anywhere; }
+
 .chapter-nav { display: flex; justify-content: space-between; gap: 1rem; margin-top: 3rem; }
+.chapter-nav a { text-decoration: none; }
+.chapter-nav a:hover { text-decoration: underline; }
 .continues { margin-top: 4rem; color: #d8c67e; font: italic 1.3rem Georgia, serif; text-align: center; }
 
 @media (max-width: 640px) {
@@ -51,7 +153,10 @@ pre { color: #e8eee7; font: 1rem/1.75 Georgia, serif; white-space: pre-wrap; ove
   .chronicle-intro, .unavailable { margin: 5rem auto 3rem; }
   .year-group { padding-left: 1.2rem; }
   .year-group li::before { left: -1.52rem; }
-  .chapter-shell article { margin: 4rem auto; }
+  .chapter-article { margin: 3rem auto; }
+  .folio-body { font-size: 1rem; }
+  .folio-body ul { padding-left: 1.2rem; }
+  .mode-controls button { flex: 1 1 auto; }
   .evidence dl { grid-template-columns: 1fr; }
   .chapter-nav { font-size: .88rem; }
   .chapter-nav span { display: none; }

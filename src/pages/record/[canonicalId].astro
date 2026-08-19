@@ -2,6 +2,7 @@
 import '../../styles/reader.css';
 import { loadGeneratedArchive } from '../../lib/lore/archive-cover-state';
 import { orderedRecords, recordRoute } from '../../lib/lore/reader-model';
+import { renderMarkdown } from '../../lib/lore/markdown';
 
 export function getStaticPaths() {
   const archive = loadGeneratedArchive();
@@ -10,10 +11,22 @@ export function getStaticPaths() {
 }
 const { record, previous, next, provenance } = Astro.props;
 const hasOriginal = typeof record.canonical.original === 'string' && record.canonical.original.length > 0;
+const originalHtml = hasOriginal ? renderMarkdown(record.canonical.original as string) : '';
+const commentaryHtml = renderMarkdown(record.canonical.comment);
+const sourceUrl = typeof record.canonical.url === 'string' && record.canonical.url.length > 0 ? record.canonical.url : null;
 ---
-<!doctype html><html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width" /><title>{record.canonical.title} · The Pond Archive</title></head>
-<body><main class="chapter-shell"><header class="reader-header"><a href="/chronicle/">← RIPPLE CHRONICLE</a><span>THE POND ARCHIVE</span></header><article><p class="kicker">ARCHIVE DATE · {record.chronology.archiveChronologyMarker}</p><h1>{record.canonical.title}</h1><p class="canonical-id">◉ CANONICAL RECORD · {record.canonicalId}</p>{record.canonical.url ? <p><a class="source-link" href={record.canonical.url as string} target="_blank" rel="noreferrer">Source ↗</a></p> : null}
+<!doctype html><html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>{record.canonical.title} · The Pond Archive</title></head>
+<body><main class="chapter-shell"><header class="reader-header"><a href="/chronicle/">← RIPPLE CHRONICLE</a><span>THE POND ARCHIVE</span></header><article class="chapter-article">
+<p class="kicker">ARCHIVE DATE · {record.chronology.archiveChronologyMarker}</p>
+<h1>{record.canonical.title}</h1>
+<p class="canonical-id">◉ CANONICAL RECORD · {record.canonicalId}</p>
+{!hasOriginal && sourceUrl ? <p><a class="source-link source-link--top" href={sourceUrl} target="_blank" rel="noreferrer">Source ↗</a></p> : null}
 <div class="mode-controls" role="group" aria-label="Reading mode">{hasOriginal ? <button type="button" data-mode="original" aria-pressed="false">Original</button> : null}<button type="button" data-mode="commentary" aria-pressed="false">Commentary</button><button type="button" data-mode="both" aria-pressed="true">Both</button></div>
-{hasOriginal ? <section data-evidence-section="original"><h2>Original Record</h2><pre>{record.canonical.original}</pre></section> : null}<section data-evidence-section="commentary"><h2>Commentary</h2><pre>{record.canonical.comment}</pre></section>
-<details class="evidence"><summary>Evidence Lens</summary><div><h2>Record-level evidence</h2><dl><dt>Canonical record ID</dt><dd>{record.canonicalId}</dd><dt>Archive date</dt><dd>{record.chronology.archiveChronologyMarker} — chronology marker, not asserted publication timestamp.</dd><dt>Title</dt><dd>{record.canonical.title}</dd>{record.canonical.url ? <><dt>Source URL</dt><dd class="break"><a href={record.canonical.url as string} target="_blank" rel="noreferrer">{record.canonical.url}</a></dd></> : null}</dl><h2>Snapshot-level provenance</h2><dl><dt>Repository</dt><dd>{provenance.repository}</dd><dt>Path</dt><dd>{provenance.path}</dd><dt>Commit</dt><dd class="break">{provenance.commit}</dd><dt>Source digest</dt><dd class="break">{provenance.sourceDigest}</dd><dt>Record count</dt><dd>{provenance.recordCount}</dd></dl></div></details>
+
+{hasOriginal ? <section class="original-folio" data-evidence-section="original" aria-label="Original Record"><p class="folio-label">Original Record</p><div class="folio-body folio-body--source" set:html={originalHtml} />{sourceUrl ? <p class="folio-source"><a class="source-link" href={sourceUrl} target="_blank" rel="noreferrer">Source ↗</a></p> : null}</section> : null}
+
+<section class="commentary-folio" data-evidence-section="commentary" aria-label="Commentary"><p class="folio-label folio-label--muted">Commentary</p><div class="folio-body folio-body--commentary" set:html={commentaryHtml} /></section>
+
+<details class="evidence"><summary>Evidence Lens</summary><div><h2>Record-level evidence</h2><dl><dt>Canonical record ID</dt><dd>{record.canonicalId}</dd><dt>Archive date</dt><dd>{record.chronology.archiveChronologyMarker} — chronology marker, not asserted publication timestamp.</dd><dt>Title</dt><dd>{record.canonical.title}</dd>{sourceUrl ? <><dt>Source URL</dt><dd class="break"><a href={sourceUrl} target="_blank" rel="noreferrer">{sourceUrl}</a></dd></> : null}</dl><h2>Snapshot-level provenance</h2><dl><dt>Repository</dt><dd>{provenance.repository}</dd><dt>Path</dt><dd>{provenance.path}</dd><dt>Commit</dt><dd class="break">{provenance.commit}</dd><dt>Source digest</dt><dd class="break">{provenance.sourceDigest}</dd><dt>Record count</dt><dd>{provenance.recordCount}</dd></dl></div></details>
+
 <nav class="chapter-nav" aria-label="Chronological record navigation">{previous ? <a href={recordRoute(previous.canonicalId)}>← Previous record</a> : <span />}{next ? <a href={recordRoute(next.canonicalId)}>Next record →</a> : <span />}</nav>{!next ? <p class="continues">The Lore Continues…</p> : null}</article></main><script is:inline>{`document.querySelectorAll('[data-mode]').forEach((button) => button.addEventListener('click', () => { const mode = button.dataset.mode; document.querySelectorAll('[data-mode]').forEach((item) => item.setAttribute('aria-pressed', String(item.dataset.mode === mode))); document.querySelectorAll('[data-evidence-section]').forEach((section) => { section.hidden = mode !== 'both' && section.dataset.evidenceSection !== mode; }); }));`}</script></body></html>
