@@ -19,6 +19,7 @@ const verified = archive.status === 'verified';
       <div class="moon" aria-hidden="true"></div>
       <div class="ripple ripple-one" aria-hidden="true"></div>
       <div class="ripple ripple-two" aria-hidden="true"></div>
+      <div class="stars" aria-hidden="true">{Array.from({ length: 12 }, (_, index) => <i class={`star star-${index + 1}`}></i>)}</div>
 
       <nav class="wordmark" aria-label="ToadAid Lore Reader">
         <span class="wordmark-mark">◉</span>
@@ -37,6 +38,7 @@ const verified = archive.status === 'verified';
           <section class="archive-state verified-state" aria-label="Verified canonical archive state">
             <p class="record-count">{archive.recordCount} records preserved</p>
             <p class="snapshot-status"><span class="status-dot" aria-hidden="true"></span> Canonical snapshot <code aria-label={`Canonical commit ${archive.canonicalCommit}`}>{archive.canonicalCommit.slice(0, 9)}…</code></p>
+            <a class="enter-archive" href="/chronicle/">Enter the Archive <span aria-hidden="true">→</span></a>
           </section>
         ) : (
           <p class="snapshot-status unavailable-state"><span class="status-dot" aria-hidden="true"></span> Awaiting a verified canonical snapshot</p>

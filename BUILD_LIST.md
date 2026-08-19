@@ -12,10 +12,12 @@
 ## P1 — Book Reader
 
 - [x] Pond Archive cover — implemented with verified generated-snapshot state and an honest unavailable state.
-- [ ] Ripple Chronicle.
-- [ ] Chapter reader.
-- [ ] Evidence Lens.
-- [ ] Progress / continue reading.
+- [x] Living night atmosphere and verified Enter Archive navigation.
+- [x] Ripple Chronicle.
+- [x] Chapter reader.
+- [x] Evidence Lens.
+- [x] Original / Commentary / Both and deterministic previous / next navigation.
+- [ ] Persistent reading progress / Continue Reading persistence.
 - [ ] Bookmarks.
 - [ ] Original / Commentary / Both.
 - [ ] Appearance / font controls.

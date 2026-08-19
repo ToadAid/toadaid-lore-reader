@@ -1,0 +1,13 @@
+---
+import '../../styles/reader.css';
+import { loadGeneratedArchive } from '../../lib/lore/archive-cover-state';
+import { orderedRecords, recordRoute, yearFor } from '../../lib/lore/reader-model';
+
+const archive = loadGeneratedArchive();
+const records = archive.status === 'verified' ? orderedRecords(archive.records) : [];
+const years = Object.entries(Object.groupBy(records, yearFor));
+---
+<!doctype html><html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width" /><title>Ripple Chronicle · The Pond Archive</title></head>
+<body><main class="reader-shell"><header class="reader-header"><a href="/">THE POND ARCHIVE</a><span>RIPPLE CHRONICLE</span></header>
+{archive.status === 'verified' ? <><section class="chronicle-intro"><p class="kicker">CANONICAL CHRONOLOGY</p><h1>Ripple Chronicle</h1><p>{archive.provenance.recordCount} canonical records, ordered by archive chronology marker.</p></section><nav class="chronicle" aria-label="Canonical lore chronology">{years.map(([year, entries]) => <section class="year-group"><h2>{year}</h2><ol>{entries!.map((record) => <li><a href={recordRoute(record.canonicalId)}><time>Archive date · {record.chronology.archiveChronologyMarker}</time><span>{record.canonical.title}</span><small>{record.canonicalId}</small></a></li>)}</ol></section>)}</nav></> : <section class="unavailable"><h1>Ripple Chronicle</h1><p>Awaiting a verified canonical snapshot.</p></section>}
+</main></body></html>
