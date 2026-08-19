@@ -2,6 +2,7 @@
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
+import { buildLegacyMediaCandidateManifest, validateLegacyMediaCandidateManifest } from '../src/lib/lore/legacy-media-candidates.ts';
 
 const EXPECTED = Object.freeze({
   repository: 'ToadAid/toadaid.github.io',
@@ -89,6 +90,14 @@ async function main() {
   await mkdir(outputDirectory, { recursive: true });
   await writeFile(resolve(outputDirectory, 'reader-snapshot.json'), `${JSON.stringify(snapshot, null, 2)}\n`);
   await writeFile(resolve(outputDirectory, 'LORE_SOURCE.json'), `${JSON.stringify(source, null, 2)}\n`);
+
+  // Derived legacy-media candidate manifest, from the SAME canonical load,
+  // provenance, and snapshot generation. Build then self-validate before
+  // writing so the generated output is provably consistent. No network, no
+  // media fetching; derived solely from canonical bytes.
+  const candidateManifest = buildLegacyMediaCandidateManifest(snapshot.records, source);
+  validateLegacyMediaCandidateManifest(candidateManifest, snapshot);
+  await writeFile(resolve(outputDirectory, 'legacy-media-candidates.json'), `${JSON.stringify(candidateManifest, null, 2)}\n`);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
