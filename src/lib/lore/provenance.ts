@@ -1,6 +1,6 @@
 export const CANONICAL_REPOSITORY = 'ToadAid/toadaid.github.io';
 export const CANONICAL_PATH = 'lore/data.json';
-export const CANONICAL_COMMIT = '041c2ea6fda8284f61fb35c7101d083623d235ba';
+export const CANONICAL_COMMIT = '464933cecb6f508a980a66d37c8a7ef7add2f53d';
 
 export interface LoreSourceProvenance {
   schemaVersion: '1.0.0';
@@ -11,4 +11,3 @@ export interface LoreSourceProvenance {
   recordCount: number;
   generatedAt: string;
 }
-

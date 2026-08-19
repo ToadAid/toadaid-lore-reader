@@ -7,6 +7,7 @@
 - [x] Validating local importer generates a derived snapshot and `LORE_SOURCE.json`.
 - [x] Canonical record, chronology, evidence, and media schema boundaries defined.
 - [x] Source-contract tests and minimal static build established.
+- [x] Exact Git-object import proven against canonical commit `464933cecb6f508a980a66d37c8a7ef7add2f53d`: 130 records, 130 unique IDs, and derived provenance/snapshot output.
 
 ## P1 — Book Reader
 
@@ -29,4 +30,3 @@
 - [ ] Not started.
 
 Completion here is mechanical only; it does not indicate review or acceptance.
-
