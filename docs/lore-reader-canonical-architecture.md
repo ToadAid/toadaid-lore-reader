@@ -21,7 +21,7 @@ canonical file + repository + path + commit
 
 `original` and `comment` remain separate canonical fields. The Reader does not combine them into a single body or classify commentary as fact. A future reader can classify material as primary source, documented fact, commentary, or interpretation without losing the source distinction.
 
-Future media/artifact references may use the `MediaReference` schema. They retain kind, source, attribution, rights status, and offline eligibility. P0 includes no gallery, player, downloader, remote embedding, or bundled third-party media.
+Future media/artifact references use the `HistoricalArtifact` contract (see `docs/historical-artifact-contract.md`): an explicitly-authored stable `artifactId`, separate `type` and `role` axes, distinct `sourceUrl` and `archivePath`, a governed canonical `expectedSha256`, and `rightsStatus`. The earlier `MediaReference` scaffold was superseded. No gallery, player, downloader, remote embedding, or bundled third-party media is implemented yet.
 
 ## Offline and updates
 
