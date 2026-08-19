@@ -9,7 +9,7 @@ const canonical = {
   repository: 'ToadAid/toadaid.github.io',
   path: 'lore/data.json',
   commit: '464933cecb6f508a980a66d37c8a7ef7add2f53d',
-  sourceDigest: 'sha256:test-digest',
+  sourceDigest: 'sha256:8635376f18805eb0677cdcfce92e8b63ce8d6f530c1fcab06e4f1348f323f984',
   recordCount: 2,
   generatedAt: '2026-08-19T00:00:00.000Z',
 };
@@ -21,8 +21,8 @@ async function withGenerated(mutator: (provenance: Record<string, unknown>, snap
     schemaVersion: '1.0.0',
     provenance: { ...provenance },
     records: [
-      { canonicalId: 'TOBY_A', canonical: { id: 'TOBY_A' } },
-      { canonicalId: 'TOBY_B', canonical: { id: 'TOBY_B' } },
+      { canonicalId: 'TOBY_A', canonical: { id: 'TOBY_A', date: '2024-01-01', title: 'A', comment: 'A' }, chronology: { archiveChronologyMarker: '2024-01-01', sortKey: '2024-01-01\u0000TOBY_A', hasVerifiedPublicationTimestamp: false } },
+      { canonicalId: 'TOBY_B', canonical: { id: 'TOBY_B', date: '2024-01-01', title: 'B', comment: 'B' }, chronology: { archiveChronologyMarker: '2024-01-01', sortKey: '2024-01-01\u0000TOBY_B', hasVerifiedPublicationTimestamp: false } },
     ],
   };
   mutator(provenance, snapshot);
@@ -51,6 +51,7 @@ for (const [name, mutate] of [
   ['wrong repository', (p: Record<string, unknown>) => { p.repository = 'other/archive'; }],
   ['wrong source path', (p: Record<string, unknown>) => { p.path = 'other.json'; }],
   ['wrong canonical commit', (p: Record<string, unknown>) => { p.commit = '0000000000000000000000000000000000000000'; }],
+  ['wrong source digest', (p: Record<string, unknown>) => { p.sourceDigest = 'sha256:0000000000000000000000000000000000000000000000000000000000000000'; }],
   ['snapshot/provenance count mismatch', (_p: Record<string, unknown>, s: Record<string, unknown>) => { s.records = []; }],
   ['duplicate snapshot canonical IDs', (_p: Record<string, unknown>, s: Record<string, unknown>) => { (s.records as Array<Record<string, unknown>>)[1].canonicalId = 'TOBY_A'; }],
 ] as const) {
