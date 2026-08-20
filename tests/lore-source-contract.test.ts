@@ -42,8 +42,25 @@ test('chronology marker does not become publication claim', () => {
   assert.equal(chronology.hasVerifiedPublicationTimestamp, false);
   assert.equal('publishedAt' in chronology, false);
 });
-test('exact provenance binding is retained and invalid provenance fails closed', () => {
+test('exact provenance binding is retained and permanent identity fails closed', () => {
   const result = build();
   assert.deepEqual({ repository: result.source.repository, path: result.source.path, commit: result.source.commit }, provenance);
-  assert.throws(() => build(shaped, { ...provenance, commit: '0000000000000000000000000000000000000000' }), /not bound/);
+  // Permanent identity: repository and path are architecture constants. A
+  // different repository or path is refused regardless of commit.
+  assert.throws(() => build(shaped, { ...provenance, repository: 'other/repo' }), /canonical repository/);
+  assert.throws(() => build(shaped, { ...provenance, path: 'other.json' }), /canonical path/);
+});
+test('the canonical commit is advanceable, not hard-pinned forever', () => {
+  // A different exact full SHA is a legitimate future reviewed generation and
+  // must be accepted. The commit is generation-specific, not a permanent law.
+  const next = { ...provenance, commit: '0'.repeat(40) };
+  const result = build(shaped, next);
+  assert.equal(result.source.commit, '0'.repeat(40));
+  assert.equal(result.source.repository, provenance.repository);
+  assert.equal(result.source.path, provenance.path);
+});
+test('a non-exact commit SHA is refused', () => {
+  assert.throws(() => build(shaped, { ...provenance, commit: '464933c' }), /lowercase hex SHA/); // short
+  assert.throws(() => build(shaped, { ...provenance, commit: 'main' }), /lowercase hex SHA/); // branch name
+  assert.throws(() => build(shaped, { ...provenance, commit: 'not-a-sha' }), /lowercase hex SHA/); // malformed
 });

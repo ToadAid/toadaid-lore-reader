@@ -26,6 +26,7 @@
 
 - [x] Historical artifact contract defined (Stage 2A-P1): authored identity, governed digest, source vs archive locator, type vs role, rights, original vs derivative, derived admission state. No importer, manifest, rendering, or fetching yet.
 - [x] Legacy media candidate manifest generated (Stage 2A-P2): importer emits a provenance-bound `generated/legacy-media-candidates.json` from legacy `img`; deterministic `legacy-img:<id>` candidate keys (NOT artifactIds); REFERENCE_ONLY state; fail-closed validation. No rendering, fetching, or PWA yet.
+- [x] Canonical source-advancement binding repair (Stage 2A-P2R): the importer no longer hard-pins one canonical commit. Repository/path are permanent architecture constants; the commit is an explicit, reviewed, advanceable full SHA. Source bytes are mechanically bound to the exact Git object `<commit>:lore/data.json` via read-only Git plumbing (no caller-supplied bytes, no working-tree authority, no network). Mutability/advancement + byte-binding + fail-closed proofs added. The current generation commit `464933cecb6f508a980a66d37c8a7ef7add2f53d` remains the current imported generation, not a permanent import law.
 - [ ] Not otherwise started.
 
 ## P3 — PWA / Offline
