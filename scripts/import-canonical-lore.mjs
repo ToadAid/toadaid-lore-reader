@@ -1,33 +1,40 @@
 #!/usr/bin/env node
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { CANONICAL_REPOSITORY, CANONICAL_PATH, FULL_SHA_RE } from '../src/lib/lore/provenance.ts';
+import { readCanonicalBytes } from '../src/lib/lore/canonical-git-source.ts';
 import { buildLegacyMediaCandidateManifest, validateLegacyMediaCandidateManifest } from '../src/lib/lore/legacy-media-candidates.ts';
 
-const EXPECTED = Object.freeze({
-  repository: 'ToadAid/toadaid.github.io',
-  sourcePath: 'lore/data.json',
-  commit: '464933cecb6f508a980a66d37c8a7ef7add2f53d',
-});
-
 function fail(message) { throw new Error(`Canonical lore import refused: ${message}`); }
+
+// The ONLY arguments the operator may supply to the production canonical import
+// CLI. Repository identity and canonical source path are PERMANENT Reader
+// architecture constants (imported above); they are NOT accepted from the
+// command line, so the caller cannot redefine canonical historical identity.
+const ALLOWED_ARGS = new Set(['canonical-repo', 'commit', 'generated-at', 'output']);
+
+// Obsolete weak-CLI flags that allowed arbitrary caller bytes plus an unrelated
+// real commit SHA (false provenance). They are now rejected explicitly.
+const OBSOLETE_ARGS = new Set(['source', 'repository', 'source-path']);
 
 function parseArgs(argv) {
   const args = {};
   for (let index = 0; index < argv.length; index += 2) {
     const key = argv[index];
     const value = argv[index + 1];
-    if (!key?.startsWith('--') || value === undefined || value.startsWith('--')) fail('arguments must be --name value pairs');
-    args[key.slice(2)] = value;
+    if (!key?.startsWith('--')) fail('arguments must be --name value pairs');
+    const name = key.slice(2);
+    if (value === undefined || value.startsWith('--')) fail(`--${name} requires a value`);
+    if (OBSOLETE_ARGS.has(name)) {
+      fail(`--${name} is no longer accepted; the production canonical CLI binds bytes to the exact git object via --canonical-repo and --commit`);
+    }
+    if (!ALLOWED_ARGS.has(name)) fail(`unknown argument --${name}`);
+    args[name] = value;
   }
-  for (const key of ['source', 'repository', 'source-path', 'commit']) if (!args[key]) fail(`missing --${key}`);
+  if (!args['canonical-repo']) fail('missing --canonical-repo (local canonical git repository path)');
+  if (!args.commit) fail('missing --commit (exact full reviewed canonical commit SHA)');
   return args;
-}
-
-function assertExactProvenance(args) {
-  if (args.repository !== EXPECTED.repository) fail('repository is not the exact canonical repository');
-  if (args['source-path'] !== EXPECTED.sourcePath) fail('source path is not the exact canonical path');
-  if (args.commit !== EXPECTED.commit) fail('commit is not the exact canonical commit');
 }
 
 function assertRecord(record, index) {
@@ -41,8 +48,13 @@ function assertRecord(record, index) {
 }
 
 export function buildSnapshot(sourceBytes, provenance, generatedAt = new Date().toISOString()) {
-  if (provenance.repository !== EXPECTED.repository || provenance.path !== EXPECTED.sourcePath || provenance.commit !== EXPECTED.commit) {
-    fail('provenance is not bound to the exact canonical source');
+  // Permanent identity: repository and path are Reader architecture constants.
+  if (provenance.repository !== CANONICAL_REPOSITORY) fail('provenance is not bound to the exact canonical repository');
+  if (provenance.path !== CANONICAL_PATH) fail('provenance is not bound to the exact canonical path');
+  // Advanceable generation: the commit must be an exact full reviewed SHA, but
+  // it is NOT pinned to a single authorized commit forever.
+  if (typeof provenance.commit !== 'string' || !FULL_SHA_RE.test(provenance.commit)) {
+    fail('provenance commit is not an exact 40-character lowercase hex SHA');
   }
   let records;
   try { records = JSON.parse(sourceBytes); } catch { fail('source is not valid JSON'); }
@@ -78,14 +90,20 @@ export function buildSnapshot(sourceBytes, provenance, generatedAt = new Date().
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  assertExactProvenance(args);
-  const sourcePath = resolve(args.source);
-  const sourceBytes = await readFile(sourcePath, 'utf8');
-  const { source, snapshot } = buildSnapshot(sourceBytes, {
-    repository: args.repository,
-    path: args['source-path'],
-    commit: args.commit,
+
+  // ONE canonical load: bytes are mechanically obtained from the exact Git
+  // object `<commit>:lore/data.json` inside the local canonical repository.
+  // The caller cannot supply independent source bytes. No network, no mutation.
+  const { bytes, commit, path } = readCanonicalBytes(args['canonical-repo'], args.commit);
+
+  // Provenance identity comes from Reader constants, not the command line. The
+  // commit is the exact reviewed SHA bound above.
+  const { source, snapshot } = buildSnapshot(bytes, {
+    repository: CANONICAL_REPOSITORY,
+    path,
+    commit,
   }, args['generated-at']);
+
   const outputDirectory = resolve(args.output ?? 'generated');
   await mkdir(outputDirectory, { recursive: true });
   await writeFile(resolve(outputDirectory, 'reader-snapshot.json'), `${JSON.stringify(snapshot, null, 2)}\n`);
@@ -94,7 +112,7 @@ async function main() {
   // Derived legacy-media candidate manifest, from the SAME canonical load,
   // provenance, and snapshot generation. Build then self-validate before
   // writing so the generated output is provably consistent. No network, no
-  // media fetching; derived solely from canonical bytes.
+  // media fetching; derived solely from the exact canonical bytes.
   const candidateManifest = buildLegacyMediaCandidateManifest(snapshot.records, source);
   validateLegacyMediaCandidateManifest(candidateManifest, snapshot);
   await writeFile(resolve(outputDirectory, 'legacy-media-candidates.json'), `${JSON.stringify(candidateManifest, null, 2)}\n`);
