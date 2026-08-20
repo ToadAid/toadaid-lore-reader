@@ -10,7 +10,7 @@
     "import:canonical": "node scripts/import-canonical-lore.mjs"
   },
   "devDependencies": {
-    "astro": "^5.16.0",
+    "astro": "^7.2.4",
     "typescript": "^5.9.0"
   }
 }
