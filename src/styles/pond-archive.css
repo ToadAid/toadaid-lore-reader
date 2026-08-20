@@ -34,32 +34,58 @@ body { margin: 0; min-width: 320px; }
   background: linear-gradient(90deg, rgba(1, 8, 8, .18), transparent 26%, transparent 74%, rgba(1, 8, 8, .18));
 }
 
-.moon, .ripple { display: none; }
-.stars { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+.moon { display: none; }
+.stars, .pond-lights { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.archive-cover > :not(.moon, .ripple, .pond-lights, .stars) { position: relative; z-index: 1; }
 .star {
   position: absolute;
-  width: 2px;
-  height: 2px;
+  width: 1px;
+  height: 1px;
   border-radius: 50%;
-  background: #e8f4d8;
-  opacity: .4;
-  animation: twinkle var(--duration, 6s) var(--delay, 0s) ease-in-out infinite;
+  background: #e7eef0;
+  opacity: var(--low, .14);
+  animation: twinkle var(--duration, 8s) var(--delay, 0s) ease-in-out infinite;
 }
-/* desktop: stars placed only in clear-sky pockets — never across the
-   moon (x40–68, y4–31) nor the central cloud band (y20–44, x20–82).
-   Moon occlusion + cloud avoidance are obeyed by conservative
-   deterministic positioning, not masking. Sparse, irregular, 6L/4R. */
-.star:nth-child(1)  { left: 24%; top: 9%;  --duration: 5s;   --delay: 0s;   box-shadow: 0 0 6px 1px rgba(190, 238, 202, .55); }
-.star:nth-child(2)  { left: 31%; top: 17%; --duration: 8s;   --delay: 3s;   width: 1px; height: 1px; }
-.star:nth-child(3)  { left: 18%; top: 13%; --duration: 6s;   --delay: 1.5s; width: 1px; height: 1px; }
-.star:nth-child(4)  { left: 13%; top: 29%; --duration: 4.5s; --delay: 4s; }
-.star:nth-child(5)  { left: 79%; top: 8%;  --duration: 7s;   --delay: 2s;   box-shadow: 0 0 6px 1px rgba(190, 238, 202, .5); }
-.star:nth-child(6)  { left: 86%; top: 14%; --duration: 5.5s; --delay: 5s;   width: 1px; height: 1px; }
-.star:nth-child(7)  { left: 92%; top: 28%; --duration: 8.5s; --delay: 1s; }
-.star:nth-child(8)  { left: 88%; top: 42%; --duration: 3.8s; --delay: 6s;   width: 1px; height: 1px; }
-.star:nth-child(9)  { left: 7%;  top: 38%; --duration: 6.5s; --delay: 2.5s; width: 1px; height: 1px; }
-.star:nth-child(10) { left: 15%; top: 46%; --duration: 7.5s; --delay: 4.5s; width: 1px; height: 1px; }
-.star:nth-child(11), .star:nth-child(12) { display: none; }
+.star--faint { box-shadow: 0 0 3px rgba(222, 237, 240, .18); --low: .1; --peak: .34; --scale: 1; }
+.star--medium { width: 2px; height: 2px; background: #edf2e8; box-shadow: 0 0 5px rgba(225, 239, 221, .38); --low: .18; --peak: .55; --scale: 1.08; }
+.star--bright { width: 2px; height: 2px; background: #f3eee0; box-shadow: 0 0 7px 1px rgba(237, 224, 194, .46); --low: .26; --peak: .7; --scale: 1.12; }
+/* Every desktop coordinate is in a verified upper-sky pocket: left/right of
+   the moon halo, above the cloud deck, and inside the branch-free opening. */
+.star-1 { left: 27%; top: 4%; --duration: 10.5s; --delay: -3s; }
+.star-2 { left: 30%; top: 8%; --duration: 8.5s; --delay: -6s; }
+.star-3 { left: 33%; top: 3%; --duration: 9.5s; --delay: -1s; }
+.star-4 { left: 35%; top: 13%; --duration: 11s; --delay: -8s; }
+.star-5 { left: 37%; top: 7%; --duration: 7.5s; --delay: -4s; }
+.star-6 { left: 39%; top: 16%; --duration: 10s; --delay: -7s; }
+.star-7 { left: 41%; top: 10%; --duration: 9s; --delay: -2s; }
+.star-8 { left: 65%; top: 5%; --duration: 11s; --delay: -5s; }
+.star-9 { left: 67%; top: 13%; --duration: 8s; --delay: -6s; }
+.star-10 { left: 69%; top: 3%; --duration: 10.5s; --delay: -1s; }
+.star-11 { left: 71%; top: 10%; --duration: 9.5s; --delay: -8s; }
+.star-12 { left: 73%; top: 16%; --duration: 7.5s; --delay: -3s; }
+.star-13 { left: 28%; top: 16%; --duration: 10s; --delay: -4s; }
+.star-14 { left: 72%; top: 7%; --duration: 8.5s; --delay: -7s; }
+.star-15 { left: 31%; top: 12%; --duration: 6.5s; --delay: -2s; }
+.star-16 { left: 36%; top: 6%; --duration: 7s; --delay: -5s; }
+.star-17 { left: 40%; top: 4%; --duration: 5.5s; --delay: -1s; }
+.star-18 { left: 66%; top: 9%; --duration: 6s; --delay: -4s; }
+.star-19 { left: 70%; top: 14%; --duration: 7.5s; --delay: -6s; }
+.star-20 { left: 29%; top: 11%; --duration: 5.5s; --delay: -3s; }
+.star-21 { left: 68%; top: 6%; --duration: 6.5s; --delay: -7s; }
+.star-22 { left: 72%; top: 12%; --duration: 8s; --delay: -2s; }
+.pond-light { position: absolute; width: 2px; height: 2px; border-radius: 50%; background: #e9bf64; box-shadow: 0 0 7px 2px rgba(224, 173, 73, .34); opacity: .22; animation: lantern-glow var(--light-duration, 10s) var(--light-delay, 0s) ease-in-out infinite; }
+.pond-light-1 { left: 11%; top: 57%; --light-duration: 12s; --light-delay: -4s; }
+.pond-light-2 { left: 19%; top: 56%; --light-duration: 9s; --light-delay: -7s; }
+.pond-light-3 { left: 29%; top: 55%; --light-duration: 13s; --light-delay: -2s; }
+.pond-light-4 { left: 48%; top: 56%; --light-duration: 8s; --light-delay: -6s; }
+.pond-light-5 { left: 79%; top: 57%; --light-duration: 11s; --light-delay: -3s; }
+.pond-light-6 { left: 88%; top: 59%; --light-duration: 14s; --light-delay: -8s; }
+.pond-light-7 { left: 95%; top: 62%; --light-duration: 10s; --light-delay: -5s; }
+.pond-light-8 { left: 70%; top: 63%; --light-duration: 12s; --light-delay: -1s; }
+.ripple { position: absolute; z-index: 0; left: 50%; width: 38vw; height: 3.4vw; border: 1px solid rgba(197, 222, 215, .16); border-radius: 50%; box-shadow: 0 0 14px rgba(157, 205, 195, .06); opacity: .12; pointer-events: none; transform: translateX(-50%) scale(.97); }
+.ripple-one { top: 67%; }
+.ripple-two { top: 74%; width: 50vw; height: 4vw; }
+.ripple-three { top: 82%; width: 32vw; height: 2.8vw; }
 .enter-archive{margin-top:.85rem;color:#e9f4e9;font-size:.78rem;font-weight:700;letter-spacing:.1em;text-decoration:none;border-bottom:1px solid #82dc9f;padding:.5rem .1rem}.enter-archive span{color:#91e8ae;padding-left:.25rem}
 
 .wordmark {
@@ -101,32 +127,51 @@ body { margin: 0; min-width: 320px; }
     background-position: center, center, center center;
   }
   .cover-copy { margin-top: 4rem; max-width: 24rem; }
-  .cover-copy h1 { font-size: clamp(3.4rem, 16vw, 5.4rem); }
+  .cover-copy h1 { font-size: clamp(2.5rem, 12vw, 4.6rem); }
   .intro { max-width: 19rem; font-size: .84rem; }
   .source-note { max-width: 15rem; }
   .cover-footnote { display: none; }
-  /* portrait crop: re-tune stars to extreme left/right clear-sky margins,
-     avoiding the upper-center moon/halo, central cloud mass, and title. */
-  .star:nth-child(1) { left: 6%;  top: 8%; }
-  .star:nth-child(2) { left: 11%; top: 19%; }
-  .star:nth-child(3) { left: 8%;  top: 31%; }
-  .star:nth-child(4) { left: 92%; top: 11%; }
-  .star:nth-child(5) { left: 88%; top: 26%; }
-  .star:nth-child(6) { left: 94%; top: 19%; }
-  .star:nth-child(n+7){display:none}
+  /* Portrait has different sky: its clear pockets sit high and to either side
+     of the centered moon; all desktop-only coordinates are suppressed. */
+  .star:nth-child(n+11) { display: none; }
+  .star-1 { left: 27%; top: 3%; }
+  .star-2 { left: 34%; top: 8%; }
+  .star-3 { left: 39%; top: 4%; }
+  .star-4 { left: 42%; top: 12%; }
+  .star-5 { left: 58%; top: 4%; }
+  .star-6 { left: 64%; top: 9%; }
+  .star-7 { left: 70%; top: 3%; }
+  .star-8 { left: 74%; top: 13%; }
+  .star-9 { left: 30%; top: 15%; }
+  .star-10 { left: 75%; top: 8%; }
+  .star-8, .star-9 { width: 2px; height: 2px; background: #edf2e8; box-shadow: 0 0 5px rgba(225, 239, 221, .38); --low: .18; --peak: .55; --scale: 1.08; }
+  .star-10 { width: 2px; height: 2px; background: #f3eee0; box-shadow: 0 0 7px 1px rgba(237, 224, 194, .46); --low: .26; --peak: .7; --scale: 1.12; }
+  .pond-light:nth-child(n+6) { display: none; }
+  .pond-light-1 { left: 5%; top: 53%; }
+  .pond-light-2 { left: 11%; top: 56%; }
+  .pond-light-3 { left: 23%; top: 58%; }
+  .pond-light-4 { left: 84%; top: 53%; }
+  .pond-light-5 { left: 91%; top: 56%; }
+  .ripple { width: 64vw; height: 6vw; }
+  .ripple-one { top: 67%; }
+  .ripple-two { top: 75%; width: 82vw; height: 7vw; }
+  .ripple-three { top: 83%; width: 56vw; height: 5vw; }
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .ripple-one { animation: breathe 8s ease-in-out infinite; }
-  .ripple-two { animation: breathe 8s 1.2s ease-in-out infinite reverse; }
+  .ripple-one { animation: water-ripple 13s ease-in-out infinite; }
+  .ripple-two { animation: water-ripple 16s -6s ease-in-out infinite; }
+  .ripple-three { animation: water-ripple 18s -11s ease-in-out infinite; }
 }
 
-@keyframes breathe { 50% { opacity: .48; transform: translateX(-50%) scale(1.025); } }
+@keyframes water-ripple { 50% { opacity: .22; transform: translateX(-50%) scale(1.04); } }
+@keyframes lantern-glow { 50% { opacity: .5; } }
 @keyframes twinkle {
-  0%   { opacity: .2;  transform: scale(.9); }
-  45%  { opacity: .85; transform: scale(1.05); }
-  100% { opacity: .35; transform: scale(.95); }
+  0%, 100% { opacity: var(--low); transform: scale(.96); }
+  52% { opacity: var(--peak); transform: scale(var(--scale)); }
 }
 @media (prefers-reduced-motion: reduce) {
   .star { animation: none; opacity: .45; transform: none; }
+  .pond-light { animation: none; opacity: .28; }
+  .ripple { animation: none; opacity: .07; }
 }
