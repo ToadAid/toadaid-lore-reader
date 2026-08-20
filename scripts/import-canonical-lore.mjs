@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { CANONICAL_REPOSITORY, CANONICAL_PATH, FULL_SHA_RE } from '../src/lib/lore/provenance.ts';
 import { readCanonicalBytes } from '../src/lib/lore/canonical-git-source.ts';
 import { buildLegacyMediaCandidateManifest, validateLegacyMediaCandidateManifest } from '../src/lib/lore/legacy-media-candidates.ts';
+import { buildMediaInterpretationManifest, validateMediaInterpretationManifest } from '../src/lib/lore/media-interpretation.ts';
 
 function fail(message) { throw new Error(`Canonical lore import refused: ${message}`); }
 
@@ -116,6 +117,16 @@ async function main() {
   const candidateManifest = buildLegacyMediaCandidateManifest(snapshot.records, source);
   validateLegacyMediaCandidateManifest(candidateManifest, snapshot);
   await writeFile(resolve(outputDirectory, 'legacy-media-candidates.json'), `${JSON.stringify(candidateManifest, null, 2)}\n`);
+
+  // Derived media-interpretation manifest (Stage 2A-P2M1), from the SAME
+  // canonical load and snapshot generation. Classification only: it derives a
+  // deterministic media interpretation of each legacy `img` and of recognized
+  // media references in `original`, WITHOUT preservation, downloading,
+  // rendering, artifact admission, or canonical mutation. The sealed P2
+  // candidate manifest above is unchanged; this is a separate derived layer.
+  const interpretationManifest = buildMediaInterpretationManifest(snapshot.records, source);
+  validateMediaInterpretationManifest(interpretationManifest, snapshot);
+  await writeFile(resolve(outputDirectory, 'media-interpretation.json'), `${JSON.stringify(interpretationManifest, null, 2)}\n`);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
