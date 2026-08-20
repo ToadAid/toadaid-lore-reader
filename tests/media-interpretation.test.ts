@@ -320,3 +320,218 @@ test('an originalReference not present in the snapshot original is refused', () 
   (entry as { originalReferences: { classification: { reference: string } }[] }).originalReferences[0].classification.reference = 'https://youtu.be/NOTINTEXT';
   assert.throws(() => validateMediaInterpretationManifest(m, snapshot), /not found in snapshot original/);
 });
+
+// ---------------------------------------------------------------------------
+// Stage 2A-P2M1 PR#7 review repair — exact-derivation adversarial proofs.
+//
+// The validator must prove the manifest is the EXACT deterministic derivation
+// of the snapshot, not merely internally consistent. Each test below mutates a
+// valid manifest in one targeted way and proves the validator refuses it.
+// A richer fixture (multiple `original` references) is used where order/length
+// matters. The snapshot is authority; the manifest is derived output.
+// ---------------------------------------------------------------------------
+
+// Fixture with a record carrying TWO recognized `original` references (YOUTUBE
+// then IMAGE) plus a record with an `img` IMAGE — so order, length, counts, and
+// per-record membership can all be probed.
+const multiRefFixture = JSON.stringify([
+  { id: 'TOBY_M1', date: '2025-01-01', title: 'M1', comment: 'c', original: 'first https://youtu.be/vid1 then https://x.test/a.png', url: '', img: '', tags: 't' },
+  { id: 'TOBY_M2', date: '2025-02-02', title: 'M2', comment: 'c', original: 'no media', url: '', img: 'https://toadaid.github.io/assets/lore/x.jpg', tags: 't' },
+  { id: 'TOBY_NOMEDIA', date: '2025-03-03', title: 'N', comment: 'c', original: 'just prose', url: '', img: '', tags: 't' },
+]);
+
+function clone(m: unknown) { return JSON.parse(JSON.stringify(m)); }
+function findOriginalEntry(m: { interpretations: { originalReferences: unknown[] }[] }) {
+  return m.interpretations.find((e) => e.originalReferences.length > 0)!;
+}
+
+// 1. classification kind changed from YOUTUBE to IMAGE (same reference string).
+test('1. originalReferences kind changed from YOUTUBE to IMAGE is refused', () => {
+  const { manifest, snapshot } = buildManifest(multiRefFixture);
+  const m = clone(manifest);
+  const entry = findOriginalEntry(m as { interpretations: { originalReferences: { classification: { kind: string } }[] }[] });
+  entry.originalReferences[0].classification.kind = 'IMAGE';
+  assert.throws(() => validateMediaInterpretationManifest(m, snapshot), /deterministic derivation/);
+});
+
+// 2. aggregate counts adjusted to hide the changed kind (internally consistent).
+test('2. counts adjusted to hide a changed kind are refused (snapshot is authority)', () => {
+  const { manifest, snapshot } = buildManifest(multiRefFixture);
+  const m = clone(manifest);
+  const entry = findOriginalEntry(m as { interpretations: { originalReferences: { classification: { kind: string } }[] }[] });
+  // Flip the first original reference YOUTUBE -> IMAGE and rebalance counts so
+  // referenceCount still equals the sum of counts. Internal consistency alone
+  // must NOT be enough — the per-record derivation disagrees.
+  entry.originalReferences[0].classification.kind = 'IMAGE';
+  (m as { counts: Record<string, number> }).counts.YOUTUBE -= 1;
+  (m as { counts: Record<string, number> }).counts.IMAGE += 1;
+  assert.throws(() => validateMediaInterpretationManifest(m, snapshot), /deterministic derivation/);
+});
+
+// 3. wrong occurrenceIndex.
+test('3. a wrong occurrenceIndex is refused', () => {
+  const { manifest, snapshot } = buildManifest(multiRefFixture);
+  const m = clone(manifest);
+  const entry = findOriginalEntry(m as { interpretations: { originalReferences: { occurrenceIndex: number }[] }[] });
+  entry.originalReferences[0].occurrenceIndex = 999;
+  assert.throws(() => validateMediaInterpretationManifest(m, snapshot), /deterministic derivation/);
+});
+
+// 4. reordered original references.
+test('4. reordered original references are refused (document order is exact)', () => {
+  const { manifest, snapshot } = buildManifest(multiRefFixture);
+  const m = clone(manifest);
+  const entry = findOriginalEntry(m as { interpretations: { originalReferences: unknown[] }[] });
+  // Reverse the two recognized references: [YOUTUBE, IMAGE] -> [IMAGE, YOUTUBE].
+  entry.originalReferences.reverse();
+  // Re-index occurrenceIndex to be self-consistent so only ORDER is wrong.
+  entry.originalReferences.forEach((r: { occurrenceIndex: number }, i: number) => { r.occurrenceIndex = i; });
+  assert.throws(() => validateMediaInterpretationManifest(m, snapshot), /deterministic derivation/);
+});
+
+// 5. omitted original reference.
+test('5. an omitted original reference is refused', () => {
+  const { manifest, snapshot } = buildManifest(multiRefFixture);
+  const m = clone(manifest);
+  const entry = findOriginalEntry(m as { interpretations: { originalReferences: unknown[] }[] });
+  entry.originalReferences.pop();
+  assert.throws(() => validateMediaInterpretationManifest(m, snapshot), /deterministic derivation/);
+});
+
+// 6. duplicated original reference.
+test('6. a duplicated original reference is refused', () => {
+  const { manifest, snapshot } = buildManifest(multiRefFixture);
+  const m = clone(manifest);
+  const entry = findOriginalEntry(m as { interpretations: { originalReferences: unknown[] }[] });
+  entry.originalReferences.push(JSON.parse(JSON.stringify(entry.originalReferences[0])));
+  assert.throws(() => validateMediaInterpretationManifest(m, snapshot), /deterministic derivation/);
+});
+
+// 7. injected extra original reference (a recognized media string not in this record's original).
+test('7. an injected extra original reference is refused', () => {
+  const { manifest, snapshot } = buildManifest(multiRefFixture);
+  const m = clone(manifest);
+  const entry = findOriginalEntry(m as { interpretations: { originalReferences: { classification: { kind: string; reference: string }; occurrenceIndex: number }[] }[] });
+  entry.originalReferences.push({ classification: { kind: 'IMAGE', reference: KNOWN_IMG_A }, occurrenceIndex: 2 });
+  assert.throws(() => validateMediaInterpretationManifest(m, snapshot), /deterministic derivation|not found in snapshot original/);
+});
+
+// 8. correct reference string but wrong classification kind.
+test('8. a correct reference string with the wrong kind is refused', () => {
+  const { manifest, snapshot } = buildManifest(multiRefFixture);
+  const m = clone(manifest);
+  const entry = findOriginalEntry(m as { interpretations: { originalReferences: { classification: { kind: string } }[] }[] });
+  // Second ref is an IMAGE (a.png); mislabel it as AUDIO but keep the string.
+  entry.originalReferences[1].classification.kind = 'AUDIO';
+  assert.throws(() => validateMediaInterpretationManifest(m, snapshot), /deterministic derivation/);
+});
+
+// 9. valid classification kind but wrong reference/order pairing.
+test('9. a valid kind paired with the wrong reference is refused', () => {
+  const { manifest, snapshot } = buildManifest(multiRefFixture);
+  const m = clone(manifest);
+  const entry = findOriginalEntry(m as { interpretations: { originalReferences: { classification: { reference: string } }[] }[] });
+  // Swap the reference strings between the two (valid kinds, wrong pairing).
+  const r0 = entry.originalReferences[0].classification.reference;
+  const r1 = entry.originalReferences[1].classification.reference;
+  entry.originalReferences[0].classification.reference = r1;
+  entry.originalReferences[1].classification.reference = r0;
+  assert.throws(() => validateMediaInterpretationManifest(m, snapshot), /deterministic derivation/);
+});
+
+// 10. changed referenceCount with internally balanced counts.
+test('10. a changed referenceCount with internally balanced counts is refused', () => {
+  const { manifest, snapshot } = buildManifest(multiRefFixture);
+  const m = clone(manifest);
+  // Inflate referenceCount and one count together so sum(counts) still equals
+  // referenceCount. Internal consistency must NOT be enough.
+  (m as { referenceCount: number }).referenceCount = 99;
+  (m as { counts: Record<string, number> }).counts.IMAGE += 96;
+  assert.throws(() => validateMediaInterpretationManifest(m, snapshot), /deterministic derivation/);
+});
+
+// 11. changed interpretedRecordCount.
+test('11. a changed interpretedRecordCount is refused', () => {
+  const { manifest, snapshot } = buildManifest(multiRefFixture);
+  const m = clone(manifest);
+  (m as { interpretedRecordCount: number }).interpretedRecordCount = 99;
+  assert.throws(() => validateMediaInterpretationManifest(m, snapshot), /interpretedRecordCount/);
+});
+
+// 12. omitted expected interpretation record (counts rebalanced so the
+// exact-derivation gate, not a trivial length check, catches it).
+test('12. an omitted expected interpretation record is refused', () => {
+  const { manifest, snapshot } = buildManifest(multiRefFixture);
+  const m = clone(manifest);
+  (m as { interpretations: unknown[] }).interpretations.pop();
+  (m as { interpretedRecordCount: number }).interpretedRecordCount = (m as { interpretations: unknown[] }).interpretations.length;
+  assert.throws(() => validateMediaInterpretationManifest(m, snapshot), /deterministic derivation/);
+});
+
+// 13. added unexpected interpretation record (a real snapshot id with no media,
+// counts rebalanced so the exact-derivation gate catches it).
+test('13. an added unexpected interpretation record is refused', () => {
+  const { manifest, snapshot } = buildManifest(multiRefFixture);
+  const m = clone(manifest);
+  // TOBY_NOMEDIA exists in the snapshot but has no media, so the builder never
+  // emits an interpretation for it. Adding one must be refused by derivation.
+  (m as { interpretations: { canonicalId: string; originalReferences: unknown[] }[] }).interpretations.push({
+    canonicalId: 'TOBY_NOMEDIA',
+    originalReferences: [],
+  });
+  (m as { interpretedRecordCount: number }).interpretedRecordCount = (m as { interpretations: unknown[] }).interpretations.length;
+  assert.throws(() => validateMediaInterpretationManifest(m, snapshot), /deterministic derivation/);
+});
+
+// 14. artifact/preservation field injected on the originalReferences[j] wrapper.
+test('14. an artifact field on an originalReferences wrapper is refused', () => {
+  const { manifest, snapshot } = buildManifest(multiRefFixture);
+  const m = clone(manifest);
+  const entry = findOriginalEntry(m as { interpretations: { originalReferences: Record<string, unknown>[] }[] });
+  entry.originalReferences[0].artifactId = 'X_MEDIA_Y';
+  assert.throws(() => validateMediaInterpretationManifest(m, snapshot), /artifactId/);
+});
+
+// 15. artifact/preservation field injected on originalReferences[j].classification.
+test('15. an artifact field on an originalReferences classification is refused', () => {
+  const { manifest, snapshot } = buildManifest(multiRefFixture);
+  const m = clone(manifest);
+  const entry = findOriginalEntry(m as { interpretations: { originalReferences: { classification: Record<string, unknown> }[] }[] });
+  entry.originalReferences[0].classification.archivePath = 'archive/x';
+  assert.throws(() => validateMediaInterpretationManifest(m, snapshot), /archivePath/);
+});
+
+// Retain-proof: the valid deterministic manifest still passes after the repair.
+test('retain: a valid manifest built from the snapshot still validates', () => {
+  const { manifest, snapshot } = buildManifest(multiRefFixture);
+  validateMediaInterpretationManifest(manifest, snapshot);
+  validateMediaInterpretationManifest(clone(manifest), snapshot);
+});
+
+// Retain-proof: exact imgClassification re-derivation still enforced (img kind corrupted).
+test('retain: an imgClassification kind corruption is still refused by exact re-derivation', () => {
+  const { manifest, snapshot } = buildManifest(multiRefFixture);
+  const m = clone(manifest);
+  const entry = (m as { interpretations: { imgClassification?: { kind: string } }[] }).interpretations.find((e) => e.imgClassification);
+  entry!.imgClassification!.kind = 'AUDIO';
+  assert.throws(() => validateMediaInterpretationManifest(m, snapshot), /imgClassification does not match/);
+});
+
+// Retain-proof: unknown legacy img remains UNKNOWN_REFERENCE (not guessed as IMAGE).
+test('retain: an unknown legacy img remains UNKNOWN_REFERENCE and is not guessed', () => {
+  const fixture = JSON.stringify([
+    { id: 'TOBY_U', date: '2024-01-01', title: 'U', comment: 'c', img: 'https://example.test/nope' },
+  ]);
+  const { manifest, snapshot } = buildManifest(fixture);
+  assert.equal(manifest.interpretations[0].imgClassification.kind, 'UNKNOWN_REFERENCE');
+  validateMediaInterpretationManifest(manifest, snapshot);
+});
+
+// Retain-proof: the known dangling refs classify as IMAGE only, never preserved.
+test('retain: the known dangling refs classify as IMAGE with no preservation fields', () => {
+  for (const ref of [KNOWN_IMG_A, KNOWN_IMG_B]) {
+    const c = classifyMediaReference(ref)!;
+    assert.equal(c.kind, 'IMAGE');
+    assert.deepEqual(Object.keys(c).sort(), ['kind', 'reference']);
+  }
+});

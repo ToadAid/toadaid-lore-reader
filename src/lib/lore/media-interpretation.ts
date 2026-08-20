@@ -294,6 +294,41 @@ function assertClassification(value: unknown, where: string): MediaClassificatio
 }
 
 /**
+ * Strict deep equality used to prove the supplied manifest is the EXACT
+ * deterministic derivation of the snapshot, not merely internally consistent.
+ * Catches kind swaps, occurrence-index changes, reordering, omissions,
+ * duplicates, injected references, and aggregate-count drift that the
+ * plausibility checks above cannot. Own-key order is irrelevant (objects are
+ * compared by key membership and value); array order is significant.
+ */
+function deepStrictEqual(a: unknown, b: unknown, path: string): void {
+  if (Object.is(a, b)) return;
+  if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') {
+    manifestFail(`manifest does not equal deterministic derivation at ${path}`);
+  }
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) {
+      manifestFail(`manifest does not equal deterministic derivation at ${path} (array length/order)`);
+    }
+    for (let i = 0; i < a.length; i += 1) {
+      deepStrictEqual((a as unknown[])[i], (b as unknown[])[i], `${path}[${i}]`);
+    }
+    return;
+  }
+  const ak = Object.keys(a as object);
+  const bk = Object.keys(b as object);
+  if (ak.length !== bk.length) {
+    manifestFail(`manifest does not equal deterministic derivation at ${path} (field set)`);
+  }
+  for (const k of ak) {
+    if (!Object.prototype.hasOwnProperty.call(b, k)) {
+      manifestFail(`manifest does not equal deterministic derivation at ${path} (unexpected field '${k}')`);
+    }
+    deepStrictEqual((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k], `${path}.${k}`);
+  }
+}
+
+/**
  * Build a generated media-interpretation manifest from a Reader snapshot's
  * records and provenance. Deterministic: identical canonical bytes yield
  * identical interpretations, counts, and ordering.
@@ -433,6 +468,16 @@ export function validateMediaInterpretationManifest(
 
     if (!Array.isArray(entry.originalReferences)) manifestFail(`interpretation ${index} originalReferences is not an array`);
     for (const [j, ref] of (entry.originalReferences as Record<string, unknown>[]).entries()) {
+      if (!ref || typeof ref !== 'object' || Array.isArray(ref)) {
+        manifestFail(`interpretation ${index} originalReferences[${j}] is not an object`);
+      }
+      // Forbidden preservation/artifact fields must not appear on the wrapper
+      // either (only `classification` and `occurrenceIndex` are permitted here).
+      for (const field of FORBIDDEN_INTERPRETATION_FIELDS) {
+        if ((ref as Record<string, unknown>)[field] !== undefined) {
+          manifestFail(`interpretation ${index} originalReferences[${j}] must not contain field '${field}'`);
+        }
+      }
       const c = assertClassification((ref as Record<string, unknown>)?.classification, `interpretation ${index} originalReferences[${j}].classification`);
       // original references must be recognized kinds (never UNKNOWN_REFERENCE)
       if (c.kind === 'UNKNOWN_REFERENCE') {
@@ -447,6 +492,19 @@ export function validateMediaInterpretationManifest(
       }
     }
   }
+
+  // Final authoritative gate: re-derive the EXACT expected media interpretation
+  // deterministically from the snapshot (one source of derivation truth — the
+  // same builder used to author the manifest) and require the supplied manifest
+  // to be strictly, semantically equal to it. The snapshot is authority; the
+  // manifest is derived output. This refuses any mutation the plausibility
+  // checks above cannot catch: kind swaps, occurrence-index changes, reordered
+  // /omitted/duplicated/injected original references, and aggregate counts that
+  // are internally consistent but wrong. It also re-confirms exact per-kind
+  // counts, referenceCount, interpretedRecordCount, provenance, and which
+  // records appear (and in which order) — all against canonical derivation.
+  const expected = buildMediaInterpretationManifest(snapshot.records, snapshot.provenance);
+  deepStrictEqual(m, expected, 'manifest');
 
   return {
     schemaVersion: MEDIA_INTERPRETATION_MANIFEST_SCHEMA_VERSION,
