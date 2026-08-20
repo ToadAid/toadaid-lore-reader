@@ -19,7 +19,9 @@ const verified = archive.status === 'verified';
       <div class="moon" aria-hidden="true"></div>
       <div class="ripple ripple-one" aria-hidden="true"></div>
       <div class="ripple ripple-two" aria-hidden="true"></div>
-      <div class="stars" aria-hidden="true">{Array.from({ length: 12 }, (_, index) => <i class={`star star-${index + 1}`}></i>)}</div>
+      <div class="ripple ripple-three" aria-hidden="true"></div>
+      <div class="pond-lights" aria-hidden="true">{Array.from({ length: 8 }, (_, index) => <i class={`pond-light pond-light-${index + 1}`}></i>)}</div>
+      <div class="stars" aria-hidden="true">{Array.from({ length: 22 }, (_, index) => <i class={`star star-${index + 1} ${index < 14 ? 'star--faint' : index < 19 ? 'star--medium' : 'star--bright'}`}></i>)}</div>
 
       <nav class="wordmark" aria-label="ToadAid Lore Reader">
         <span class="wordmark-mark">◉</span>
