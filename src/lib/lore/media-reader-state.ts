@@ -198,12 +198,25 @@ export function projectMediaItem(
       mode = https ? 'audio' : (safe ? 'link' : 'text');
       break;
     case 'YOUTUBE':
-      videoId = deriveYouTubeVideoId(reference);
-      if (videoId !== null) {
-        mode = 'youtube';
-        embedUrl = youtubeEmbedUrl(videoId);
+      // Active YouTube rendering requires BOTH a safe web scheme on the
+      // original reference AND a derivable 11-char id. P2M1 classification is
+      // intentionally scheme-agnostic (host/path shape only), so an unsafe
+      // scheme (javascript:, data:, file:, ftp:, …) must never cross into an
+      // active embed merely because an id can be parsed. No active video id /
+      // embed url is projected for an unsafe scheme (fail-closed). The nocookie
+      // embed url is always HTTPS by construction regardless of the original
+      // scheme, so a safe HTTP original still activates the privacy-conscious
+      // HTTPS player.
+      if (!safe) {
+        mode = 'text';
       } else {
-        mode = safe ? 'link' : 'text';
+        videoId = deriveYouTubeVideoId(reference);
+        if (videoId !== null) {
+          mode = 'youtube';
+          embedUrl = youtubeEmbedUrl(videoId);
+        } else {
+          mode = 'link';
+        }
       }
       break;
     case 'UNKNOWN_REFERENCE':

@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { buildSnapshot } from '../scripts/import-canonical-lore.mjs';
-import { buildMediaInterpretationManifest } from '../src/lib/lore/media-interpretation.ts';
+import { buildMediaInterpretationManifest, classifyMediaReference } from '../src/lib/lore/media-interpretation.ts';
 import { CANONICAL_REPOSITORY, CANONICAL_PATH } from '../src/lib/lore/provenance.ts';
 import {
   loadMediaReaderState,
@@ -338,3 +339,120 @@ function fixtureState(): Extract<ReturnType<typeof loadMediaReaderState>, { stat
   }
   return cachedState as Extract<ReturnType<typeof loadMediaReaderState>, { status: 'verified' }>;
 }
+
+// ---------------------------------------------------------------------------
+// Stage 2A-P2M2 narrow rendering safety repair — defect regression tests.
+// ---------------------------------------------------------------------------
+
+const TEST_DIR = dirname(fileURLToPath(import.meta.url));
+const RECORD_PAGE_SRC = readFileSync(join(TEST_DIR, '..', 'src', 'pages', 'record', '[canonicalId].astro'), 'utf8');
+const READER_CSS_SRC = readFileSync(join(TEST_DIR, '..', 'src', 'styles', 'reader.css'), 'utf8');
+
+// --- Defect 1: unsafe-scheme YOUTUBE must never become active ----------------
+
+test('P2M1 still classifies youtube-host unsafe-scheme URLs as YOUTUBE (the defect precondition)', () => {
+  // These ARE YOUTUBE by host/path shape (P2M1 is scheme-agnostic) — which is
+  // exactly why the rendering layer must independently gate on a safe scheme.
+  assert.equal(classifyMediaReference('file://youtube.com/watch?v=dQw4w9WgXcQ')?.kind, 'YOUTUBE');
+  assert.equal(classifyMediaReference('javascript://youtube.com/watch?v=dQw4w9WgXcQ')?.kind, 'YOUTUBE');
+});
+
+test('Defect 1: file:// YouTube never becomes mode youtube / embed / active link', () => {
+  const item = projectMediaItem('original', 0, { kind: 'YOUTUBE', reference: 'file://youtube.com/watch?v=dQw4w9WgXcQ' });
+  assert.equal(item.mode, 'text', 'unsafe-scheme YouTube must be text-only');
+  assert.equal(item.safeHref, null, 'no active link for unsafe scheme');
+  assert.equal(item.videoId, null, 'no active video id projected for unsafe scheme');
+  assert.equal(item.embedUrl, null, 'no embed url projected for unsafe scheme');
+  assert.equal(item.inlineHttps, false);
+});
+
+test('Defect 1: javascript:// YouTube never becomes mode youtube / embed / active link', () => {
+  const item = projectMediaItem('original', 0, { kind: 'YOUTUBE', reference: 'javascript://youtube.com/watch?v=dQw4w9WgXcQ' });
+  assert.equal(item.mode, 'text');
+  assert.equal(item.safeHref, null);
+  assert.equal(item.videoId, null);
+  assert.equal(item.embedUrl, null);
+});
+
+test('Defect 1: other unsafe schemes (data:, ftp:) over a youtube host stay non-active', () => {
+  for (const ref of ['data://youtube.com/watch?v=dQw4w9WgXcQ', 'ftp://youtube.com/watch?v=dQw4w9WgXcQ']) {
+    const item = projectMediaItem('original', 0, { kind: 'YOUTUBE', reference: ref });
+    assert.equal(item.mode, 'text', `${ref} must be text-only`);
+    assert.equal(item.safeHref, null);
+    assert.equal(item.embedUrl, null);
+  }
+});
+
+test('Defect 1: safe HTTPS YouTube still click-loads the nocookie iframe', () => {
+  const item = projectMediaItem('original', 0, { kind: 'YOUTUBE', reference: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' });
+  assert.equal(item.mode, 'youtube');
+  assert.equal(item.videoId, 'dQw4w9WgXcQ');
+  assert.equal(item.embedUrl, 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ');
+  assert.equal(item.safeHref, 'https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+});
+
+test('Defect 1: safe HTTP YouTube satisfies the safe-web-scheme boundary and activates the HTTPS nocookie player', () => {
+  const item = projectMediaItem('original', 0, { kind: 'YOUTUBE', reference: 'http://www.youtube.com/watch?v=dQw4w9WgXcQ' });
+  assert.equal(item.mode, 'youtube', 'safe HTTP YouTube may click-to-load; embed is HTTPS nocookie by construction');
+  assert.equal(item.videoId, 'dQw4w9WgXcQ');
+  assert.equal(item.embedUrl, 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ');
+  assert.equal(item.inlineHttps, false);
+  assert.equal(item.safeHref, 'http://www.youtube.com/watch?v=dQw4w9WgXcQ');
+});
+
+// --- Defect 2: VIDEO / AUDIO must retain an external reference link -----------
+
+test('Defect 2: projection retains safeHref for VIDEO and AUDIO', () => {
+  const state = fixtureState();
+  const video = renderItemsForRecord(state.byId.get('M_VID'));
+  const audio = renderItemsForRecord(state.byId.get('M_AUD'));
+  assert.equal(video[0].mode, 'video');
+  assert.ok(video[0].safeHref, 'VIDEO must carry safeHref for the external link');
+  assert.equal(audio[0].mode, 'audio');
+  assert.ok(audio[0].safeHref, 'AUDIO must carry safeHref for the external link');
+});
+
+test('Defect 2: the record page template emits a native <video> AND a nearby external reference link', () => {
+  assert.match(RECORD_PAGE_SRC, /<video class="media-video" controls preload="none"/, 'native <video> with controls + preload none');
+  assert.match(RECORD_PAGE_SRC, /<source src=\{item\.safeHref\} \/><\/video><a class="source-link media-ref" href=\{item\.safeHref\} target="_blank" rel="noreferrer">External media reference \(video\) ↗<\/a>/, 'VIDEO must be followed by a safe external reference link');
+});
+
+test('Defect 2: the record page template emits a native <audio> AND a nearby external reference link', () => {
+  assert.match(RECORD_PAGE_SRC, /<audio class="media-audio" controls preload="none"/, 'native <audio> with controls + preload none');
+  assert.match(RECORD_PAGE_SRC, /<source src=\{item\.safeHref\} \/><\/audio><a class="source-link media-ref" href=\{item\.safeHref\} target="_blank" rel="noreferrer">External media reference \(audio\) ↗<\/a>/, 'AUDIO must be followed by a safe external reference link');
+});
+
+// --- Defect 3: activated YouTube iframe must be mobile-bounded ----------------
+
+test('Defect 3: the runtime script gives the activated iframe the dedicated bounded class', () => {
+  assert.match(RECORD_PAGE_SRC, /iframe\.className\s*=\s*['"]media-youtube-frame['"]/, 'iframe must receive the media-youtube-frame class');
+});
+
+test('Defect 3: the stylesheet bounds the activated iframe (max-width / width / aspect ratio)', () => {
+  const block = READER_CSS_SRC.match(/\.media-youtube-frame\s*\{[^}]*\}/);
+  assert.ok(block, '.media-youtube-frame rule must exist in reader.css');
+  const rule = block[0];
+  assert.match(rule, /max-width:\s*100%/, 'iframe max-width: 100% to prevent overflow');
+  assert.match(rule, /width:\s*100%/, 'iframe width: 100%');
+  assert.match(rule, /aspect-ratio:\s*16\s*\/\s*9/, 'iframe responsive 16/9 aspect ratio');
+  assert.match(rule, /height:\s*auto/, 'iframe height: auto');
+});
+
+// --- No regression: autoplay must never appear; zero build-time iframe --------
+
+test('No regression: no autoplay is configured for the YouTube iframe', () => {
+  assert.ok(!/autoplay\s*=\s*['"]?1?['"]?/.test(RECORD_PAGE_SRC), 'no autoplay attribute');
+  // The embed URL must not carry autoplay=1 either.
+  const state = fixtureState();
+  const yt = renderItemsForRecord(state.byId.get('M_YT'));
+  for (const item of yt) {
+    assert.ok(!item.embedUrl?.includes('autoplay'), 'embed url must not enable autoplay');
+  }
+});
+
+test('No regression: no build-time <iframe> is emitted by the record page template', () => {
+  // The only iframe reference must be the runtime createElement string, never a
+  // literal <iframe> element in the build-time HTML.
+  assert.ok(!/<iframe/.test(RECORD_PAGE_SRC), 'no literal <iframe> element in the template');
+  assert.match(RECORD_PAGE_SRC, /createElement\('iframe'\)/, 'iframe is created at runtime only');
+});

@@ -273,9 +273,14 @@ time, small { color: #a6bca9; font-size: .75rem; }
 .media-fallback { margin-top: .5rem; display: inline-block; }
 .media-fallback[hidden] { display: none; }
 .media-video, .media-audio { width: 100%; background: #07110d; border: 1px solid #244338; }
+/* nearby external reference link under inline video/audio (kept when playback fails) */
+.media-ref { margin-top: .5rem; display: inline-block; }
 /* YouTube click-to-load: bounded pre-load control kept beside the open link */
 .media-youtube { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; }
 .media-youtube .media-yt-load { cursor: pointer; }
+/* activated YouTube iframe: bounded so it never overflows the folio on mobile.
+   16/9 responsive aspect ratio, full-width up to the folio, no border. */
+.media-youtube-frame { display: block; width: 100%; max-width: 100%; height: auto; aspect-ratio: 16 / 9; border: 0; border-radius: 3px; }
 .media-text { display: inline-block; color: #a6bca9; font: .92em/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 /* media reference links reuse .source-link; keep long URLs from overflowing */
 .historical-media .source-link { max-width: 100%; overflow-wrap: anywhere; word-break: break-word; }
