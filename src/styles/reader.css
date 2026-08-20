@@ -25,6 +25,57 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
 .reader-header a { text-decoration: none; }
 
 /* ───────────────────────── Chronicle index ───────────────────────── */
+.chronicle-shell {
+  isolation: isolate;
+  overflow: clip;
+  position: relative;
+}
+.chronicle-shell::before,
+.chronicle-shell::after {
+  content: '';
+  inset: 0 0 auto;
+  pointer-events: none;
+  position: absolute;
+}
+.chronicle-shell::before {
+  z-index: -2;
+  height: min(76rem, 116vw);
+  background: #07100e url('/art/pond-archive/pond-archive-lotus-moon.png') top center / min(78rem, 100vw) auto no-repeat;
+}
+.chronicle-shell::after {
+  z-index: -1;
+  height: min(82rem, 125vw);
+  background:
+    linear-gradient(180deg,
+      rgba(3, 11, 24, .3) 0,
+      rgba(4, 13, 26, .48) 18rem,
+      rgba(5, 14, 20, .76) 34rem,
+      #07100e 72rem),
+    linear-gradient(90deg, rgba(3, 10, 16, .45), transparent 26%, transparent 74%, rgba(3, 10, 16, .45));
+}
+.chronicle-shell > :not(.chronicle-stars) { position: relative; z-index: 1; }
+.chronicle-stars { inset: 0 0 auto; height: min(28rem, 48vw); pointer-events: none; position: absolute; z-index: 0; }
+.chronicle-star {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #e5f4ff;
+  box-shadow: 0 0 5px rgba(194, 226, 255, .55);
+  opacity: .42;
+  animation: chronicle-twinkle 6s ease-in-out infinite alternate;
+}
+.chronicle-star-1 { left: 12%; top: 12%; animation-duration: 7s; animation-delay: -2s; }
+.chronicle-star-2 { left: 20%; top: 7%; width: 2px; height: 2px; animation-duration: 5s; animation-delay: -4s; }
+.chronicle-star-3 { left: 28%; top: 19%; width: 2px; height: 2px; animation-duration: 8s; animation-delay: -1s; }
+.chronicle-star-4 { left: 35%; top: 10%; animation-duration: 6s; animation-delay: -5s; }
+.chronicle-star-5 { left: 67%; top: 9%; width: 2px; height: 2px; animation-duration: 9s; animation-delay: -3s; }
+.chronicle-star-6 { left: 75%; top: 18%; animation-duration: 5s; animation-delay: -2s; }
+.chronicle-star-7 { left: 83%; top: 7%; width: 2px; height: 2px; animation-duration: 7s; animation-delay: -6s; }
+.chronicle-star-8 { left: 89%; top: 14%; animation-duration: 8s; animation-delay: -4s; }
+.chronicle-star-9 { left: 8%; top: 25%; width: 2px; height: 2px; animation-duration: 6s; animation-delay: -1s; }
+.chronicle-star-10 { left: 92%; top: 25%; width: 2px; height: 2px; animation-duration: 9s; animation-delay: -7s; }
+@keyframes chronicle-twinkle { from { opacity: .24; transform: scale(.8); } to { opacity: .78; transform: scale(1.15); } }
 .chronicle-intro, .unavailable { max-width: 46rem; margin: 8rem auto 4rem; text-align: center; }
 .kicker, .canonical-id { color: #8be0ac; font-size: .7rem; letter-spacing: .14em; }
 .chronicle-intro h1, .chapter-article h1 { font: 400 clamp(3rem, 7vw, 6rem)/.95 Georgia, serif; margin: .6rem 0; overflow-wrap: anywhere; }
@@ -196,8 +247,23 @@ time, small { color: #a6bca9; font-size: .75rem; }
 .continues { margin-top: 4rem; color: #d8c67e; font: italic 1.3rem Georgia, serif; text-align: center; }
 
 @media (max-width: 640px) {
+  .chronicle-shell::before {
+    height: 54rem;
+    background-size: 48rem auto;
+    background-position: 50% 0;
+  }
+  .chronicle-shell::after {
+    height: 58rem;
+    background:
+      linear-gradient(180deg, rgba(3, 11, 24, .38) 0, rgba(4, 13, 26, .58) 15rem, rgba(5, 14, 20, .84) 31rem, #07100e 53rem),
+      linear-gradient(90deg, rgba(3, 10, 16, .5), transparent 24%, transparent 76%, rgba(3, 10, 16, .5));
+  }
+  .chronicle-stars { height: 20rem; }
+  .chronicle-star:nth-child(n + 6) { display: none; }
+  .chronicle-shell .reader-header { flex-wrap: wrap; min-width: 0; }
   .reader-header { font-size: .58rem; }
-  .chronicle-intro, .unavailable { margin: 5rem auto 3rem; }
+  .chronicle-intro, .unavailable { max-width: 20rem; margin: 5rem auto 3rem; }
+  .chronicle-intro h1 { font-size: 2.25rem; }
   .year-group { padding-left: 1.2rem; }
   .year-group li::before { left: -1.52rem; }
   .chapter-article { margin: 3rem auto; }
@@ -207,4 +273,8 @@ time, small { color: #a6bca9; font-size: .75rem; }
   .evidence dl { grid-template-columns: 1fr; }
   .chapter-nav { font-size: .88rem; }
   .chapter-nav span { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chronicle-star { animation: none; opacity: .45; transform: none; }
 }
