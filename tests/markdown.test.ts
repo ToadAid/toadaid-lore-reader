@@ -1,11 +1,66 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { readFileSync } from 'node:fs';
 import { renderMarkdown, escapeHtml, isSafeUrl } from '../src/lib/lore/markdown.ts';
+import { buildSnapshot } from '../scripts/import-canonical-lore.mjs';
+import { CANONICAL_REPOSITORY, CANONICAL_PATH } from '../src/lib/lore/provenance.ts';
 
-const SNAPSHOT = JSON.parse(readFileSync('generated/reader-snapshot.json', 'utf8'));
+// ---------------------------------------------------------------------------
+// Stage 2A-CI1-R1 — clean-checkout-safe markdown tests.
+//
+// These presentation tests need real canonical-shaped records, but they must
+// NOT depend on the gitignored `generated/` operator-import artifacts (which
+// are absent on a clean checkout and made this test fail in CI). The fixture is
+// authored entirely inline here and built in-memory via the same pure
+// buildSnapshot(...) used by the importer.
+//
+// This is a small, truthful UNIT fixture. It is NOT the real 130-record
+// canonical archive. The real 130-record canonical-generation proof remains a
+// separate governed operator ceremony against exact canonical Git-object
+// bytes; no assertion here implies the fixture proves that generation.
+// ---------------------------------------------------------------------------
 
-test('canonical Original and Commentary strings are not rewritten or mutated by presentation', () => {
+const FIXTURE_SOURCE = JSON.stringify([
+  {
+    id: 'TOBY_FIX_001_FirstRipple',
+    date: '2024-03-17',
+    title: 'First Ripple',
+    comment: '## Commentary on ripples\n\nThe pond *remembers* every **ripple**, and `code` records it.\n\n> a quoted observation',
+    original: '## Original account\n\nA bare https://example.test/link appears here.\n\n- one\n- two',
+    url: '',
+    img: '',
+    tags: 't',
+  },
+  {
+    id: 'TOBY_FIX_002_QuietNote',
+    date: '2024-04-10',
+    title: 'Quiet Note',
+    comment: '## A heading comment\n\nOnly commentary here; no original account.',
+    original: '',
+    url: '',
+    img: '',
+    tags: '',
+  },
+  {
+    id: 'TOBY_FIX_003_Endurance',
+    date: '2024-05-22',
+    title: 'Endurance',
+    comment: 'A plain commentary paragraph with no heading, proving non-heading commentary still renders.',
+    original: '> quoted line\n> second line\n\n*emphasis spanning  \na hard break* and a [link](https://example.test).',
+    url: '',
+    img: '',
+    tags: 't',
+  },
+]);
+
+const { snapshot: SNAPSHOT } = buildSnapshot(
+  FIXTURE_SOURCE,
+  { repository: CANONICAL_REPOSITORY, path: CANONICAL_PATH, commit: '0'.repeat(40) },
+  '2026-08-20T00:00:00.000Z',
+);
+
+const FIXTURE_RECORD_COUNT = JSON.parse(FIXTURE_SOURCE).length;
+
+test('fixture Original and Commentary strings are not rewritten or mutated by presentation', () => {
   for (const record of SNAPSHOT.records) {
     for (const field of ['original', 'comment'] as const) {
       const source = record.canonical[field];
@@ -20,8 +75,8 @@ test('canonical Original and Commentary strings are not rewritten or mutated by 
   }
 });
 
-test('every record renders without throwing and the 130-record archive stays intact', () => {
-  assert.equal(SNAPSHOT.records.length, 130);
+test('every fixture record renders without throwing and the authored fixture stays intact', () => {
+  assert.equal(SNAPSHOT.records.length, FIXTURE_RECORD_COUNT);
   for (const record of SNAPSHOT.records) {
     assert.doesNotThrow(() => renderMarkdown(record.canonical.comment));
     if (typeof record.canonical.original === 'string') assert.doesNotThrow(() => renderMarkdown(record.canonical.original));
