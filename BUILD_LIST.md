@@ -18,7 +18,7 @@
 - [x] Evidence Lens.
 - [x] Original / Commentary / Both and deterministic previous / next navigation.
 - [ ] Persistent reading progress / Continue Reading persistence.
-- [ ] Bookmarks.
+- [ ] Lore Bookmark and Share Affordances (future cut `Stage 2A-P2U1`): persistent browser-local `localStorage` bookmarks keyed only by `canonicalId` — an ordered collection of IDs, storing no duplicated title, content, source URL, provenance, media interpretation, or canonical lore bytes. A future `/bookmarks/` Reader view resolves saved IDs against the current verified archive state; missing or removed canonical IDs fail gracefully rather than crash or show stale copied content. Corrupt, unavailable, or disabled browser storage must never break ordinary Reader use (safe degradation). Share v1 is individual lore deep links `/record/<canonicalId>` only, preferring the native Web Share API with Copy Link fallback. No bookmark-set export/import, account, wallet, backend, cloud sync, telemetry, analytics, social SDK, canonical-data mutation, or provenance mutation. Bookmark state is personal Reader-runtime state, deliberately outside canonical/provenance governance. Not yet started; P2M2 remains the next functional Reader cut.
 - [ ] Original / Commentary / Both.
 - [ ] Appearance / font controls.
 
