@@ -35,7 +35,8 @@ body { margin: 0; min-width: 320px; }
 }
 
 .moon { display: none; }
-.stars, .pond-lights { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+.stars, .pond-lights { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.archive-cover > :not(.moon, .ripple, .pond-lights, .stars) { position: relative; z-index: 1; }
 .star {
   position: absolute;
   width: 1px;
@@ -81,7 +82,7 @@ body { margin: 0; min-width: 320px; }
 .pond-light-6 { left: 88%; top: 59%; --light-duration: 14s; --light-delay: -8s; }
 .pond-light-7 { left: 95%; top: 62%; --light-duration: 10s; --light-delay: -5s; }
 .pond-light-8 { left: 70%; top: 63%; --light-duration: 12s; --light-delay: -1s; }
-.ripple { position: absolute; z-index: -1; left: 50%; width: 38vw; height: 3.4vw; border: 1px solid rgba(197, 222, 215, .12); border-radius: 50%; box-shadow: 0 0 12px rgba(157, 205, 195, .04); opacity: .08; pointer-events: none; transform: translateX(-50%) scale(.97); }
+.ripple { position: absolute; z-index: 0; left: 50%; width: 38vw; height: 3.4vw; border: 1px solid rgba(197, 222, 215, .16); border-radius: 50%; box-shadow: 0 0 14px rgba(157, 205, 195, .06); opacity: .12; pointer-events: none; transform: translateX(-50%) scale(.97); }
 .ripple-one { top: 67%; }
 .ripple-two { top: 74%; width: 50vw; height: 4vw; }
 .ripple-three { top: 82%; width: 32vw; height: 2.8vw; }
@@ -163,7 +164,7 @@ body { margin: 0; min-width: 320px; }
   .ripple-three { animation: water-ripple 18s -11s ease-in-out infinite; }
 }
 
-@keyframes water-ripple { 50% { opacity: .15; transform: translateX(-50%) scale(1.035); } }
+@keyframes water-ripple { 50% { opacity: .22; transform: translateX(-50%) scale(1.04); } }
 @keyframes lantern-glow { 50% { opacity: .5; } }
 @keyframes twinkle {
   0%, 100% { opacity: var(--low); transform: scale(.96); }
