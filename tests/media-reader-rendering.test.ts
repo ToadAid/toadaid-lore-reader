@@ -4,6 +4,7 @@ import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import vm from 'node:vm';
 import { buildSnapshot } from '../scripts/import-canonical-lore.mjs';
 import { buildMediaInterpretationManifest, classifyMediaReference } from '../src/lib/lore/media-interpretation.ts';
 import { CANONICAL_REPOSITORY, CANONICAL_PATH } from '../src/lib/lore/provenance.ts';
@@ -455,4 +456,208 @@ test('No regression: no build-time <iframe> is emitted by the record page templa
   // literal <iframe> element in the build-time HTML.
   assert.ok(!/<iframe/.test(RECORD_PAGE_SRC), 'no literal <iframe> element in the template');
   assert.match(RECORD_PAGE_SRC, /createElement\('iframe'\)/, 'iframe is created at runtime only');
+});
+// ---------------------------------------------------------------------------
+// Stage 2A-P2M2-R1 — post-merge YouTube click-to-load runtime activation repair.
+//
+// The merged defect: the runtime was authored as <script is:inline>{`...JS...`}</script>,
+// i.e. an Astro template-literal EXPRESSION. Astro emits is:inline content verbatim,
+// so the built HTML contained the literal braces+backticks: the browser evaluated
+// `{`...`}` as a template-literal expression statement (build a string, discard it)
+// and NONE of the intended querySelectorAll/addEventListener calls ever ran. This
+// is the strongest practical clean-checkout-safe proof without a DOM dependency:
+// extract the authored <script is:inline> body and execute it for real inside a
+// bounded fake-DOM sandbox using only Node's built-in node:vm.
+// ---------------------------------------------------------------------------
+
+function recordRuntimeBody(): string {
+  const match = RECORD_PAGE_SRC.match(/<script is:inline>([\s\S]*?)<\/script>/);
+  assert.ok(match, 'record page must contain an inline <script is:inline> runtime');
+  return match[1];
+}
+
+// A minimal hand-rolled DOM surface — enough for the record-page runtime. No
+// jsdom, no dependency. Captures created iframes and registered listeners so a
+// simulated click can prove the click-to-load behavior end-to-end.
+function runRecordRuntime(setup: {
+  modeButtons: { mode: string }[];
+  sections: { section: string }[];
+  ytButtons: { ytEmbed?: string }[];
+  imgs: { fallbackId: string; complete: boolean; naturalWidth: number }[];
+  fallbacks: { id: string }[];
+}) {
+  const iframes: any[] = [];
+  const makeEl = (props: Record<string, any> = {}) => ({
+    dataset: {} as Record<string, string>,
+    hidden: false, complete: false, naturalWidth: 1,
+    className: '', src: '', loading: '', title: '', allow: '', referrerPolicy: '',
+    _attrs: {} as Record<string, string>,
+    _listeners: {} as Record<string, (ev?: any) => void>,
+    _replacedWith: null as any,
+    setAttribute(k: string, v: string) { this._attrs[k] = v; },
+    addEventListener(type: string, fn: (ev?: any) => void) { this._listeners[type] = fn; },
+    replaceWith(node: any) { this._replacedWith = node; },
+    ...props,
+  });
+  const modeButtons = setup.modeButtons.map((m) => makeEl({ dataset: { mode: m.mode } }));
+  const sections = setup.sections.map((s) => makeEl({ dataset: { evidenceSection: s.section }, hidden: false }));
+  const ytButtons = setup.ytButtons.map((y) => makeEl(y.ytEmbed === undefined ? { dataset: {} } : { dataset: { ytEmbed: y.ytEmbed } }));
+  const imgs = setup.imgs.map((im) => makeEl({ dataset: { fallbackId: im.fallbackId }, complete: im.complete, naturalWidth: im.naturalWidth }));
+  const fallbacks = new Map(setup.fallbacks.map((f) => [f.id, makeEl({ hidden: true })] as const));
+  const document = {
+    querySelectorAll(selector: string): any[] {
+      if (selector === '[data-mode]') return modeButtons;
+      if (selector === '[data-evidence-section]') return sections;
+      if (selector === '.media-yt-load') return ytButtons;
+      if (selector === '[data-media-img]') return imgs;
+      return [];
+    },
+    createElement(tag: string) { const el = makeEl({ tag }); iframes.push(el); return el; },
+    getElementById(id: string) { return fallbacks.get(id) ?? null; },
+  };
+  const body = recordRuntimeBody();
+  vm.runInNewContext(body, { document, String, Number, Array, Object, Math, JSON });
+  return { iframes, modeButtons, sections, ytButtons, imgs, fallbacks, body };
+}
+
+test('R1: the record-page runtime is authored as executable JavaScript, not an inert Astro-expression string', () => {
+  const body = recordRuntimeBody();
+  // The merged defect wrapped the whole runtime in {`...`}; the body must NOT
+  // open with that inert wrapper nor close with its `} tail.
+  assert.ok(!/^\s*\{`/.test(body), 'script body must not open with an inert {` wrapper');
+  assert.ok(!/`\}\s*$/.test(body), 'script body must not close with an inert `} wrapper');
+  // It must be syntactically valid, compilable JavaScript (a template-literal
+  // expression would also compile, so the behavioral harness below is the real
+  // proof; this guards the wrapper regression at the parse layer too).
+  assert.doesNotThrow(() => new vm.Script(body), 'runtime must be syntactically valid JS');
+  // Required runtime contract tokens are present.
+  assert.ok(body.includes(".media-yt-load'"), 'YouTube button selector present');
+  assert.ok(body.includes("createElement('iframe')"), 'iframe created at runtime only');
+  assert.ok(body.includes('media-youtube-frame'), 'iframe bounded class present');
+  assert.ok(body.includes("loading = 'lazy'"), 'iframe loading=lazy present');
+  assert.ok(body.includes('strict-origin-when-cross-origin'), 'iframe referrer policy present');
+  assert.ok(body.includes("setAttribute('allowfullscreen', '')"), 'allowfullscreen present');
+  assert.ok(body.includes('https://www.youtube-nocookie.com/embed/'), 'trusted-prefix guard present');
+  assert.ok(!/autoplay\s*=\s*['"]?1/.test(body), 'no autoplay attribute');
+});
+
+test('R1: runtime click-loads exactly the clicked YouTube item into a bounded nocookie iframe; refuses bad prefix and missing embed', () => {
+  const { ytButtons, iframes } = runRecordRuntime({
+    modeButtons: [{ mode: 'both' }],
+    sections: [{ section: 'original' }, { section: 'commentary' }],
+    ytButtons: [
+      { ytEmbed: 'https://www.youtube-nocookie.com/embed/JVmwLJeeOy4' }, // good
+      { ytEmbed: 'https://evil.example/embed/x' }, // wrong origin
+      {}, // missing embed
+    ],
+    imgs: [],
+    fallbacks: [],
+  });
+  // Before any click, no iframe exists.
+  assert.equal(iframes.length, 0, 'no iframe before activation');
+  assert.ok(ytButtons[0]._listeners.click, 'good YouTube button has a click handler');
+  // Click the good button.
+  ytButtons[0]._listeners.click();
+  assert.equal(iframes.length, 1, 'exactly one iframe created for the clicked item');
+  const fr = iframes[0];
+  assert.equal(fr.src, 'https://www.youtube-nocookie.com/embed/JVmwLJeeOy4');
+  assert.ok(fr.src.startsWith('https://www.youtube-nocookie.com/embed/'), 'iframe src is the trusted nocookie embed');
+  assert.equal(fr.className, 'media-youtube-frame');
+  assert.equal(fr.loading, 'lazy');
+  assert.equal(fr.referrerPolicy, 'strict-origin-when-cross-origin');
+  assert.equal(fr._attrs['allowfullscreen'], '');
+  assert.ok(!fr.allow.includes('autoplay'), 'no autoplay in allow list');
+  assert.ok(!fr.src.includes('autoplay'), 'no autoplay in src');
+  assert.equal(ytButtons[0]._replacedWith, fr, 'the clicked button is replaced by its iframe');
+  // The other YouTube items are NOT activated by this click.
+  assert.equal(ytButtons[1]._replacedWith, null, 'unrelated item not activated');
+  assert.equal(ytButtons[2]._replacedWith, null, 'unrelated item not activated');
+  // Wrong-origin embed is refused by the trusted-prefix guard.
+  ytButtons[1]._listeners.click();
+  assert.equal(iframes.length, 1, 'wrong-origin embed refused (no new iframe)');
+  assert.equal(ytButtons[1]._replacedWith, null, 'wrong-origin button not replaced');
+  // Missing embed is refused.
+  ytButtons[2]._listeners.click();
+  assert.equal(iframes.length, 1, 'missing embed refused (no new iframe)');
+  assert.equal(ytButtons[2]._replacedWith, null, 'missing-embed button not replaced');
+});
+
+test('R1: multiple YouTube items are independently activatable', () => {
+  const { ytButtons, iframes } = runRecordRuntime({
+    modeButtons: [],
+    sections: [],
+    ytButtons: [
+      { ytEmbed: 'https://www.youtube-nocookie.com/embed/AAAAAAAAAAA' },
+      { ytEmbed: 'https://www.youtube-nocookie.com/embed/BBBBBBBBBBB' },
+    ],
+    imgs: [],
+    fallbacks: [],
+  });
+  ytButtons[0]._listeners.click();
+  ytButtons[1]._listeners.click();
+  assert.equal(iframes.length, 2, 'each item activates its own iframe');
+  assert.equal(iframes[0].src, 'https://www.youtube-nocookie.com/embed/AAAAAAAAAAA');
+  assert.equal(iframes[1].src, 'https://www.youtube-nocookie.com/embed/BBBBBBBBBBB');
+  assert.equal(ytButtons[0]._replacedWith, iframes[0]);
+  assert.equal(ytButtons[1]._replacedWith, iframes[1]);
+});
+
+test('R1: reading-mode runtime is preserved and toggles folio visibility + aria-pressed', () => {
+  const { modeButtons, sections } = runRecordRuntime({
+    modeButtons: [{ mode: 'original' }, { mode: 'commentary' }, { mode: 'both' }],
+    sections: [{ section: 'original' }, { section: 'commentary' }],
+    ytButtons: [],
+    imgs: [],
+    fallbacks: [],
+  });
+  assert.ok(modeButtons[0]._listeners.click, 'reading-mode button has a click handler');
+  modeButtons[0]._listeners.click(); // switch to Original
+  assert.equal(sections[0].hidden, false, 'original folio visible in Original mode');
+  assert.equal(sections[1].hidden, true, 'commentary folio hidden in Original mode');
+  assert.equal(modeButtons[0]._attrs['aria-pressed'], 'true');
+  assert.equal(modeButtons[1]._attrs['aria-pressed'], 'false');
+});
+
+test('R1: image-error fallback runtime is preserved and reveals the reference link on failure', () => {
+  const { imgs, fallbacks } = runRecordRuntime({
+    modeButtons: [],
+    sections: [],
+    ytButtons: [],
+    imgs: [
+      { fallbackId: 'fb-0', complete: true, naturalWidth: 0 }, // already broken at init
+      { fallbackId: 'fb-1', complete: false, naturalWidth: 1 }, // fine until an error
+    ],
+    fallbacks: [{ id: 'fb-0' }, { id: 'fb-1' }],
+  });
+  assert.ok(imgs[0]._listeners.error, 'broken image registered an error listener');
+  assert.ok(imgs[1]._listeners.error, 'fine image registered an error listener');
+  // Already-broken image is hidden and its fallback revealed at init.
+  assert.equal(imgs[0].hidden, true);
+  assert.equal(fallbacks.get('fb-0')!.hidden, false);
+  // Fine image is not yet revealed.
+  assert.equal(imgs[1].hidden, false);
+  assert.equal(fallbacks.get('fb-1')!.hidden, true);
+  // Simulate a runtime load error on the fine image.
+  imgs[1]._listeners.error();
+  assert.equal(imgs[1].hidden, true, 'failed image hidden');
+  assert.equal(fallbacks.get('fb-1')!.hidden, false, 'fallback link revealed');
+});
+
+test('R1: runtime initialization does not throw on a page with zero media / zero YouTube / image-only', () => {
+  assert.doesNotThrow(() => runRecordRuntime({ modeButtons: [{ mode: 'both' }], sections: [], ytButtons: [], imgs: [], fallbacks: [] }));
+  assert.doesNotThrow(() => runRecordRuntime({ modeButtons: [{ mode: 'both' }], sections: [], ytButtons: [], imgs: [{ fallbackId: 'fb', complete: false, naturalWidth: 1 }], fallbacks: [{ id: 'fb' }] }));
+});
+
+test('R1: "Open on YouTube" external link remains in the template, independent of the runtime', () => {
+  assert.match(RECORD_PAGE_SRC, /<a class="source-link" href=\{item\.safeHref\} target="_blank" rel="noreferrer">Open on YouTube ↗<\/a>/);
+});
+
+test('R1: the built record-page HTML carries the runtime as executable JS with no inert wrapper (operator build spot-check)', () => {
+  // Clean-checkout-safe: this reads the SOURCE runtime body (the build emits
+  // is:inline content verbatim, so executable source => executable build). The
+  // manual operator build inspection (see report) confirmed the built HTML
+  // matches: starts with a JS comment, ends with a real statement, 0 iframes.
+  const body = recordRuntimeBody();
+  const stripped = body.replace(/^\s*\/\/.*$/gm, '').trimStart();
+  assert.ok(stripped.startsWith('document.querySelectorAll'), 'first executable statement is a real querySelectorAll call, not an inert expression');
 });
