@@ -82,10 +82,10 @@ body { margin: 0; min-width: 320px; }
 .pond-light-6 { left: 88%; top: 59%; --light-duration: 14s; --light-delay: -8s; }
 .pond-light-7 { left: 95%; top: 62%; --light-duration: 10s; --light-delay: -5s; }
 .pond-light-8 { left: 70%; top: 63%; --light-duration: 12s; --light-delay: -1s; }
-.ripple { position: absolute; z-index: 0; left: 50%; width: 38vw; height: 3.4vw; border: 1px solid rgba(197, 222, 215, .16); border-radius: 50%; box-shadow: 0 0 14px rgba(157, 205, 195, .06); opacity: .12; pointer-events: none; transform: translateX(-50%) scale(.97); }
-.ripple-one { top: 67%; }
-.ripple-two { top: 74%; width: 50vw; height: 4vw; }
-.ripple-three { top: 82%; width: 32vw; height: 2.8vw; }
+.ripple { position: absolute; z-index: 0; left: 50%; width: 34vw; height: 3px; border-radius: 50%; background: radial-gradient(ellipse at center, rgba(236, 244, 230, .72), rgba(185, 216, 207, .3) 38%, transparent 72%); box-shadow: 0 0 18px rgba(177, 213, 203, .22); mix-blend-mode: screen; opacity: .16; pointer-events: none; transform: translateX(-50%) scaleX(.82); }
+.ripple-one { top: 70%; }
+.ripple-two { top: 77%; width: 48vw; height: 4px; }
+.ripple-three { top: 84%; width: 28vw; height: 3px; }
 .enter-archive{margin-top:.85rem;color:#e9f4e9;font-size:.78rem;font-weight:700;letter-spacing:.1em;text-decoration:none;border-bottom:1px solid #82dc9f;padding:.5rem .1rem}.enter-archive span{color:#91e8ae;padding-left:.25rem}
 
 .wordmark {
@@ -152,10 +152,10 @@ body { margin: 0; min-width: 320px; }
   .pond-light-3 { left: 23%; top: 58%; }
   .pond-light-4 { left: 84%; top: 53%; }
   .pond-light-5 { left: 91%; top: 56%; }
-  .ripple { width: 64vw; height: 6vw; }
-  .ripple-one { top: 67%; }
-  .ripple-two { top: 75%; width: 82vw; height: 7vw; }
-  .ripple-three { top: 83%; width: 56vw; height: 5vw; }
+  .ripple { width: 58vw; height: 3px; }
+  .ripple-one { top: 70%; }
+  .ripple-two { top: 77%; width: 76vw; height: 4px; }
+  .ripple-three { top: 84%; width: 48vw; height: 3px; }
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -164,7 +164,7 @@ body { margin: 0; min-width: 320px; }
   .ripple-three { animation: water-ripple 18s -11s ease-in-out infinite; }
 }
 
-@keyframes water-ripple { 50% { opacity: .22; transform: translateX(-50%) scale(1.04); } }
+@keyframes water-ripple { 50% { opacity: .42; transform: translateX(-50%) translateY(-1px) scaleX(1.12); } }
 @keyframes lantern-glow { 50% { opacity: .5; } }
 @keyframes twinkle {
   0%, 100% { opacity: var(--low); transform: scale(.96); }
