@@ -1,0 +1,42 @@
+name: CI
+
+# Stage 2A-CI1 — first GitHub Actions verification baseline.
+# Runs the repository's existing canonical validation surface (npm test + build)
+# for pull requests and pushes targeting main. Verification only: no deploy,
+# no publish, no artifact upload, no canonical-lore fetch, and uses no secret
+# tokens.
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+      - name: Test
+        run: npm test
+      - name: Build
+        run: npm run build
