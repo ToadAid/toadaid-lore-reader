@@ -7,15 +7,23 @@ The Lore Reader has four deliberately separate layers:
 3. **Lore Reader** — this project, a static/generated consumer of the pinned canonical source.
 4. **Mirror Study Assistant** — a future grounded study layer, not implemented here.
 
-The importer is the sole route from canonical source bytes to the Reader snapshot:
+The importer is the sole route from the canonical source to the Reader
+snapshot. Repository and path are permanent architecture constants; the commit
+is an explicit, reviewed, advanceable generation:
 
 ```text
-canonical file + repository + path + commit
+local canonical git repo + exact reviewed commit
+  -> read-only git object <commit>:lore/data.json
   -> validating local importer
-  -> generated/reader-snapshot.json + generated/LORE_SOURCE.json
+  -> generated/reader-snapshot.json + generated/LORE_SOURCE.json + generated/legacy-media-candidates.json
 ```
 
-`generated/` is ignored except for `.gitkeep`; generated lore records must never be hand-authored or edited. The snapshot retains each canonical record as supplied and adds only clearly-derived reader metadata.
+The importer derives bytes mechanically from the exact Git object, never from
+caller-supplied source bytes and never from the working tree. Mutable `main` is
+never Reader runtime authority. `generated/` is ignored except for `.gitkeep`;
+generated lore records must never be hand-authored or edited. The snapshot
+retains each canonical record as supplied and adds only clearly-derived reader
+metadata.
 
 ## Evidence and media boundaries
 
@@ -27,5 +35,10 @@ Future media/artifact references use the `HistoricalArtifact` contract (see `doc
 
 A future core offline package may include application shell, canonical lore text, metadata, chronology, search/index, and provenance. Optional media is a separate package. P0 intentionally provides no service worker, manifest, cache, or update UI.
 
-Updates must run the local importer with explicitly supplied source bytes and immutable provenance; it never fetches a mutable branch.
+Updates run the local importer against a local canonical Git repository and an
+explicit reviewed commit SHA. The importer reads the exact Git object, never
+fetches a mutable branch, and never reaches the network; if the exact commit is
+not present locally it refuses. Advancing to a newer reviewed commit is a
+separate operator ceremony (fetch/update the canonical repository) followed by
+importing that exact commit.
 
