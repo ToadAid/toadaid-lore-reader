@@ -29,12 +29,18 @@ export function validateDesktopPayload(appDirectory) {
   return { files: files.length, records: files.filter((file) => file.includes(`${sep}record${sep}`) && file.endsWith(`${sep}index.html`)).length };
 }
 export function validateDesktopPackage({ packageDirectory, platform, arch }) {
-  if (!['linux', 'win32'].includes(platform) || arch !== 'x64') fail(`unsupported package target ${platform}/${arch}`);
+  if (!['linux/x64', 'win32/x64', 'darwin/x64', 'darwin/arm64'].includes(`${platform}/${arch}`)) fail(`unsupported package target ${platform}/${arch}`);
   const root = resolve(packageDirectory);
-  const executable = resolve(root, platform === 'win32' ? 'The Pond Archive.exe' : 'The Pond Archive');
+  const bundle = platform === 'darwin' ? resolve(root, 'The Pond Archive.app') : root;
+  const executable = platform === 'darwin'
+    ? resolve(bundle, 'Contents', 'MacOS', 'The Pond Archive')
+    : resolve(root, platform === 'win32' ? 'The Pond Archive.exe' : 'The Pond Archive');
   if (!existsSync(executable) || statSync(executable).size === 0) fail(`missing or empty ${platform} executable`);
-  const payload = validateDesktopPayload(resolve(root, 'resources', 'app'));
-  return { ...payload, executable };
+  const appDirectory = platform === 'darwin'
+    ? resolve(bundle, 'Contents', 'Resources', 'app')
+    : resolve(root, 'resources', 'app');
+  const payload = validateDesktopPayload(appDirectory);
+  return { ...payload, executable, appDirectory };
 }
 if (import.meta.url === `file://${process.argv[1]}`) {
   try {

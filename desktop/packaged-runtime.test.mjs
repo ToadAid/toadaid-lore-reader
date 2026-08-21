@@ -28,10 +28,30 @@ test('desktop payload validator rejects PWA and operator material while requirin
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test('shared packager admits only Linux and Windows x64 targets', () => {
+test('shared packager admits Linux, Windows, and both macOS portable targets only', () => {
   assert.deepEqual(packageTarget(['--platform', 'linux', '--arch', 'x64']), { platform: 'linux', arch: 'x64' });
   assert.deepEqual(packageTarget(['--platform', 'win32', '--arch', 'x64']), { platform: 'win32', arch: 'x64' });
-  assert.throws(() => packageTarget(['--platform', 'darwin', '--arch', 'arm64']), /supported targets/);
+  assert.deepEqual(packageTarget(['--platform', 'darwin', '--arch', 'x64']), { platform: 'darwin', arch: 'x64' });
+  assert.deepEqual(packageTarget(['--platform', 'darwin', '--arch', 'arm64']), { platform: 'darwin', arch: 'arm64' });
+  for (const target of [['linux', 'arm64'], ['win32', 'arm64'], ['darwin', 'ia32']]) assert.throws(() => packageTarget(['--platform', target[0], '--arch', target[1]]), /supported targets/);
+});
+
+test('macOS package validation requires the .app executable and shared Resources/app payload', () => {
+  const root = mkdtempSync(join(tmpdir(), 'toadaid-macos-package-'));
+  try {
+    const app = join(root, 'The Pond Archive.app', 'Contents');
+    for (const path of ['MacOS', 'Resources/app/desktop', 'Resources/app/dist/chronicle', 'Resources/app/dist/bookmarks', 'Resources/app/dist/record/ONE']) mkdirSync(join(app, path), { recursive: true });
+    writeFileSync(join(app, 'MacOS', 'The Pond Archive'), 'Mach-O');
+    writeFileSync(join(app, 'Resources/app/package.json'), '{}');
+    for (const file of ['packaged-main.mjs', 'static-reader-host.mjs', 'navigation-policy.mjs', 'single-instance.mjs']) writeFileSync(join(app, 'Resources/app/desktop', file), 'safe');
+    for (const file of ['index.html', 'chronicle/index.html', 'bookmarks/index.html', 'record/ONE/index.html']) writeFileSync(join(app, 'Resources/app/dist', file), '<!doctype html>');
+    const result = validateDesktopPackage({ packageDirectory: root, platform: 'darwin', arch: 'arm64' });
+    assert.equal(result.records, 1);
+    assert.match(result.executable, /The Pond Archive\.app\/Contents\/MacOS\/The Pond Archive$/);
+    assert.match(result.appDirectory, /The Pond Archive\.app\/Contents\/Resources\/app$/);
+    rmSync(join(app, 'MacOS', 'The Pond Archive'));
+    assert.throws(() => validateDesktopPackage({ packageDirectory: root, platform: 'darwin', arch: 'x64' }), /missing or empty darwin executable/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 test('Windows package validation requires a non-empty .exe and shared payload', () => {

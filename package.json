@@ -13,7 +13,9 @@
     "desktop:dev": "npm run build && electron desktop/main.mjs",
     "desktop:test": "node --test desktop/*.test.mjs",
     "desktop:package:linux": "node scripts/package-desktop.mjs --platform linux --arch x64",
-    "desktop:package:windows": "node scripts/package-desktop.mjs --platform win32 --arch x64"
+    "desktop:package:windows": "node scripts/package-desktop.mjs --platform win32 --arch x64",
+    "desktop:package:macos:x64": "node scripts/package-desktop.mjs --platform darwin --arch x64",
+    "desktop:package:macos:arm64": "node scripts/package-desktop.mjs --platform darwin --arch arm64"
   },
   "devDependencies": {
     "@electron/packager": "20.3.0",

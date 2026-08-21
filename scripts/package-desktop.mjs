@@ -15,7 +15,7 @@ export function packageTarget(argv) {
   const args = Object.fromEntries(argv.map((value, index) => index % 2 === 0 ? [value, argv[index + 1]] : null).filter(Boolean));
   const platform = args['--platform'];
   const arch = args['--arch'];
-  if (!['linux', 'win32'].includes(platform) || arch !== 'x64') fail(`supported targets are linux/x64 and win32/x64; received ${platform}/${arch}`);
+  if (!(['linux/x64', 'win32/x64', 'darwin/x64', 'darwin/arm64'].includes(`${platform}/${arch}`))) fail(`supported targets are linux/x64, win32/x64, darwin/x64, and darwin/arm64; received ${platform}/${arch}`);
   return { platform, arch };
 }
 function hostIsLinuxX64() { return process.platform === 'linux' && process.arch === 'x64'; }

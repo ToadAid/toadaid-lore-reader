@@ -109,3 +109,12 @@ On the Linux packaging host, create the structurally validated Windows x64
 portable directory with `npm run desktop:package:windows`. It is unsigned,
 not an installer, and has no claimed SmartScreen trust. Live Windows dogfood
 remains pending on a real Windows x64 machine.
+
+## macOS portable offline Reader
+
+On the Linux packaging host, create separate structurally validated bundles
+with `npm run desktop:package:macos:x64` and
+`npm run desktop:package:macos:arm64`. These are unsigned portable `.app`
+bundles, not installers. macOS code signing and notarization are not
+performed, Gatekeeper trust is not claimed, and live macOS dogfood remains
+pending on real x64 and Apple Silicon Macs.
