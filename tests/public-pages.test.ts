@@ -404,6 +404,11 @@ test('admitted PWA builds are base-bounded and precache the complete static Read
     assert.equal(manifest.scope, base);
     assert.ok(manifest.icons.every((icon: { src: string }) => icon.src.startsWith(base)));
     const sw = readFileSync(join(dist, 'sw.js'), 'utf8');
+    const cover = readFileSync(join(dist, 'index.html'), 'utf8');
+    assert.match(cover, /apple-mobile-web-app-capable" content="yes"/);
+    assert.match(cover, /apple-mobile-web-app-title" content="Pond Archive"/);
+    assert.match(cover, new RegExp(`apple-touch-icon" href="${base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}art/pond-archive/pwa-icon-192\\.png"`));
+    assert.doesNotMatch(cover, /maximum-scale|user-scalable\s*=\s*no/i);
     assert.match(sw, new RegExp(`lore-${commit}`));
     assert.match(sw, /request\.method !== 'GET'/);
     assert.match(sw, /url\.origin !== self\.location\.origin/);

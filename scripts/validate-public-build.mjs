@@ -100,11 +100,44 @@ export function validatePwa(directory, requestedBase) {
   if (/https?:\/\//i.test(worker.replace(/https?:\/\/[^\n]*/g, ''))) fail('service worker contains unexpected external URL');
   const precache = worker.match(/const PRECACHE = (\[[\s\S]*?\]);/);
   if (!precache) fail('service worker precache list missing');
-  for (const resource of JSON.parse(precache[1])) {
+  const resources = JSON.parse(precache[1]);
+  let bytes = 0;
+  for (const resource of resources) {
     if (typeof resource !== 'string' || !resource.startsWith(base) || /^(?:https?:)?\/\//i.test(resource)) fail(`precache resource escapes public base: ${resource}`);
+    const local = resource.slice(base.length);
+    const path = outputPath(directory, local);
+    if (!existsSync(path)) fail(`precache resource missing from artifact: ${resource}`);
+    bytes += statSync(path).size;
+  }
+  for (const route of [base, `${base}chronicle/`, `${base}bookmarks/`]) if (!resources.includes(route)) fail(`required offline route missing: ${route}`);
+  const recordRoutes = resources.filter((resource) => resource.startsWith(`${base}record/`) && resource.endsWith('/'));
+  const recordOutput = filesBelow(resolve(directory, 'record')).filter((file) => file.endsWith(`${sep}index.html`));
+  if (recordRoutes.length !== recordOutput.length) fail('precache does not contain every canonical record route');
+  const expectedPrecache = filesBelow(directory)
+    .map((file) => relative(directory, file).replaceAll('\\', '/'))
+    .filter((file) => file !== 'sw.js')
+    .map((file) => {
+      if (file === 'index.html') return base;
+      if (file.endsWith('/index.html')) return `${base}${file.slice(0, -'index.html'.length)}`;
+      return `${base}${file}`;
+    })
+    .sort();
+  const sortedResources = [...resources].sort();
+  if (
+    expectedPrecache.length !== sortedResources.length
+    || expectedPrecache.some((resource, index) => resource !== sortedResources[index])
+  ) {
+    fail('precache does not close over the complete generated static Reader artifact');
+  }
+  for (const suffix of ['.css', '.png']) {
+    if (!resources.some((resource) => resource.endsWith(suffix))) fail(`precache lacks local ${suffix} Reader asset`);
   }
   const index = readFileSync(resolve(directory, 'index.html'), 'utf8');
   if (!index.includes(`manifest.webmanifest`) || !index.includes(`register(serviceWorkerUrl`)) fail('public PWA registration missing from cover');
+  if (!/apple-mobile-web-app-capable" content="yes"/.test(index) || !/apple-mobile-web-app-title" content="Pond Archive"/.test(index)) fail('iOS home-screen metadata missing');
+  if (!new RegExp(`apple-touch-icon" href="${base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}art/pond-archive/pwa-icon-192\\.png"`).test(index)) fail('base-aware apple touch icon missing');
+  if (/maximum-scale|user-scalable\s*=\s*no/i.test(index)) fail('viewport suppresses zoom');
+  return { entries: resources.length, bytes, htmlRoutes: resources.filter((resource) => resource.endsWith('/')).length, recordRoutes: recordRoutes.length };
 }
 
 function argsFrom(argv) {
@@ -123,8 +156,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   try {
     const args = argsFrom(process.argv.slice(2));
     const result = validatePublicBuild(args.dir, args.base);
-    if (args.pwa === '1') validatePwa(args.dir, args.base);
-    console.log(`PUBLIC_BUILD_VALID base=${result.base} documents=${result.documents} internal_references=${result.internalReferences}`);
+    const pwa = args.pwa === '1' ? validatePwa(args.dir, args.base) : null;
+    console.log(`PUBLIC_BUILD_VALID base=${result.base} documents=${result.documents} internal_references=${result.internalReferences}${pwa ? ` precache_entries=${pwa.entries} precache_bytes=${pwa.bytes} html_routes=${pwa.htmlRoutes} record_routes=${pwa.recordRoutes}` : ''}`);
   } catch (error) {
     console.error(error.message);
     process.exitCode = 1;
