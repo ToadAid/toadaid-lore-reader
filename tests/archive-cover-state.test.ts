@@ -50,8 +50,12 @@ test('valid generated artifacts produce verified state from provenance', async (
 for (const [name, mutate] of [
   ['wrong repository', (p: Record<string, unknown>) => { p.repository = 'other/archive'; }],
   ['wrong source path', (p: Record<string, unknown>) => { p.path = 'other.json'; }],
-  ['wrong canonical commit', (p: Record<string, unknown>) => { p.commit = '0000000000000000000000000000000000000000'; }],
-  ['wrong source digest', (p: Record<string, unknown>) => { p.sourceDigest = 'sha256:0000000000000000000000000000000000000000000000000000000000000000'; }],
+  // Stage 2A-P2R2: the loader no longer hardcodes a generation commit/digest.
+  // A DIFFERENT valid generation is accepted (proven below); only MALFORMED
+  // provenance form is refused. These cases use invalid forms, not merely
+  // different valid values.
+  ['malformed canonical commit', (p: Record<string, unknown>) => { p.commit = 'not-a-sha'; }],
+  ['malformed source digest', (p: Record<string, unknown>) => { p.sourceDigest = 'not-a-digest'; }],
   ['snapshot/provenance count mismatch', (_p: Record<string, unknown>, s: Record<string, unknown>) => { s.records = []; }],
   ['duplicate snapshot canonical IDs', (_p: Record<string, unknown>, s: Record<string, unknown>) => { (s.records as Array<Record<string, unknown>>)[1].canonicalId = 'TOBY_A'; }],
 ] as const) {
@@ -61,3 +65,25 @@ for (const [name, mutate] of [
     finally { await fixture.close(); }
   });
 }
+
+test('a different valid generation is accepted (no hardcoded commit/digest pin)', async () => {
+  // Stage 2A-P2R2 §14: the loader validates by identity + self-consistency, not
+  // by one hardcoded generation. A generation with a different valid commit +
+  // digest — kept self-consistent (snapshot provenance == LORE_SOURCE, count
+  // match, unique IDs) — must be accepted, proving no Reader-side commit/digest
+  // hardcode remains.
+  const nextCommit = '1a2b3c4d5e6f7081920304050607080910111213';
+  const nextDigest = 'sha256:abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789';
+  const fixture = await withGenerated((p, s) => {
+    p.commit = nextCommit;
+    p.sourceDigest = nextDigest;
+    s.provenance.commit = nextCommit;
+    s.provenance.sourceDigest = nextDigest;
+  });
+  try {
+    const state = loadArchiveCoverState(fixture.directory);
+    assert.equal(state.status, 'verified');
+    assert.equal(state.canonicalCommit, nextCommit);
+    assert.equal(state.sourceDigest, nextDigest);
+  } finally { await fixture.close(); }
+});
