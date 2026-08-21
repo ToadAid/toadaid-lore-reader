@@ -24,8 +24,17 @@ export function validateDesktopPayload(appDirectory) {
   for (const file of files.filter((file) => /\.(?:html|js|mjs)$/i.test(file))) {
     const text = readFileSync(file, 'utf8');
     if (/serviceWorker\.register|manifest\.webmanifest|\bsw\.js\b/i.test(text)) fail(`PWA runtime material staged: ${relative(root, file)}`);
+    if (/\/home\/tommy\/toadaid-lore-reader|\/home\/tommy\/toadaid\.github\.io/i.test(text)) fail(`source checkout path staged: ${relative(root, file)}`);
   }
   return { files: files.length, records: files.filter((file) => file.includes(`${sep}record${sep}`) && file.endsWith(`${sep}index.html`)).length };
+}
+export function validateDesktopPackage({ packageDirectory, platform, arch }) {
+  if (!['linux', 'win32'].includes(platform) || arch !== 'x64') fail(`unsupported package target ${platform}/${arch}`);
+  const root = resolve(packageDirectory);
+  const executable = resolve(root, platform === 'win32' ? 'The Pond Archive.exe' : 'The Pond Archive');
+  if (!existsSync(executable) || statSync(executable).size === 0) fail(`missing or empty ${platform} executable`);
+  const payload = validateDesktopPayload(resolve(root, 'resources', 'app'));
+  return { ...payload, executable };
 }
 if (import.meta.url === `file://${process.argv[1]}`) {
   try {

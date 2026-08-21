@@ -102,3 +102,10 @@ npm run desktop:package:linux
 The disposable `release/The Pond Archive-linux-x64/` directory is an
 end-user Reader only: it contains the verified static generation and no lore
 sync control, canonical checkout, Node/npm requirement, or PWA runtime.
+
+## Windows portable offline Reader
+
+On the Linux packaging host, create the structurally validated Windows x64
+portable directory with `npm run desktop:package:windows`. It is unsigned,
+not an installer, and has no claimed SmartScreen trust. Live Windows dogfood
+remains pending on a real Windows x64 machine.
