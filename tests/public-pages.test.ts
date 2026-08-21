@@ -17,6 +17,35 @@ const PAGES_BASE = '/toadaid-lore-reader/';
 const PAGES_SITE = 'https://toadaid.github.io';
 const tempDirectories: string[] = [];
 
+type PublicationOutcome = 'success' | 'sync-failed' | 'build-failed' | 'artifact-failed' | 'deploy-failed';
+
+function deploymentGenerationKey(readerSha: string, canonicalSha: string) {
+  return `public-pages-v1-reader-${readerSha}-lore-${canonicalSha}`;
+}
+
+function runPublicationCeremony(
+  successfulMarkers: Set<string>,
+  readerSha: string,
+  canonicalSha: string,
+  outcome: PublicationOutcome,
+) {
+  if (outcome === 'sync-failed') {
+    return { deployRequired: false, deployAttempted: false, markerSaved: false, key: null };
+  }
+  const key = deploymentGenerationKey(readerSha, canonicalSha);
+  if (successfulMarkers.has(key)) {
+    return { deployRequired: false, deployAttempted: false, markerSaved: false, key };
+  }
+  if (outcome === 'build-failed' || outcome === 'artifact-failed') {
+    return { deployRequired: true, deployAttempted: false, markerSaved: false, key };
+  }
+  if (outcome === 'deploy-failed') {
+    return { deployRequired: true, deployAttempted: true, markerSaved: false, key };
+  }
+  successfulMarkers.add(key);
+  return { deployRequired: true, deployAttempted: true, markerSaved: true, key };
+}
+
 test.after(() => {
   for (const directory of tempDirectories) rmSync(directory, { recursive: true, force: true });
 });
@@ -133,6 +162,97 @@ test('public workflow has the three governed automatic triggers and no PR deploy
   assert.match(WORKFLOW, /workflow_dispatch:/);
   assert.match(WORKFLOW, /push:\s*\n\s*branches:\s*\n\s*- main/);
   assert.doesNotMatch(WORKFLOW, /pull_request:/);
+});
+
+test('first exact Reader+Lore pair deploys, then the same successfully deployed pair skips', () => {
+  const markers = new Set<string>();
+  const reader = 'a'.repeat(40);
+  const lore = 'b'.repeat(40);
+  const first = runPublicationCeremony(markers, reader, lore, 'success');
+  assert.deepEqual(first, {
+    deployRequired: true,
+    deployAttempted: true,
+    markerSaved: true,
+    key: deploymentGenerationKey(reader, lore),
+  });
+  const unchanged = runPublicationCeremony(markers, reader, lore, 'success');
+  assert.equal(unchanged.deployRequired, false);
+  assert.equal(unchanged.deployAttempted, false);
+  assert.equal(unchanged.markerSaved, false);
+});
+
+test('same Reader with new canonical SHA requires deployment', () => {
+  const reader = 'a'.repeat(40);
+  const markers = new Set([deploymentGenerationKey(reader, 'b'.repeat(40))]);
+  const changed = runPublicationCeremony(markers, reader, 'c'.repeat(40), 'success');
+  assert.equal(changed.deployRequired, true);
+  assert.equal(changed.deployAttempted, true);
+});
+
+test('new Reader SHA with same canonical SHA requires deployment', () => {
+  const lore = 'b'.repeat(40);
+  const markers = new Set([deploymentGenerationKey('a'.repeat(40), lore)]);
+  const changed = runPublicationCeremony(markers, 'c'.repeat(40), lore, 'success');
+  assert.equal(changed.deployRequired, true);
+  assert.equal(changed.deployAttempted, true);
+});
+
+test('failed deployment saves no marker and the next run attempts deployment again', () => {
+  const markers = new Set<string>();
+  const reader = 'a'.repeat(40);
+  const lore = 'b'.repeat(40);
+  const failed = runPublicationCeremony(markers, reader, lore, 'deploy-failed');
+  assert.equal(failed.deployAttempted, true);
+  assert.equal(failed.markerSaved, false);
+  assert.equal(markers.size, 0);
+  const retry = runPublicationCeremony(markers, reader, lore, 'success');
+  assert.equal(retry.deployRequired, true);
+  assert.equal(retry.deployAttempted, true);
+  assert.equal(retry.markerSaved, true);
+});
+
+test('invalid sync, build failure, and artifact failure cannot deploy or save a marker', () => {
+  for (const outcome of ['sync-failed', 'build-failed', 'artifact-failed'] as const) {
+    const markers = new Set<string>();
+    const result = runPublicationCeremony(markers, 'a'.repeat(40), 'b'.repeat(40), outcome);
+    assert.equal(result.deployAttempted, false, `${outcome}: no deploy`);
+    assert.equal(result.markerSaved, false, `${outcome}: no marker`);
+    assert.equal(markers.size, 0, `${outcome}: successful marker set remains empty`);
+  }
+});
+
+test('workflow key uses exact Reader and generated canonical commits and marker is SHA-only non-authority', () => {
+  const sync = WORKFLOW.indexOf('npm run sync:canonical');
+  const generatedCommitRead = WORKFLOW.indexOf("readFileSync('generated/LORE_SOURCE.json'");
+  const markerRestore = WORKFLOW.indexOf('actions/cache/restore@v5');
+  assert.ok(sync >= 0 && generatedCommitRead > sync && markerRestore > generatedCommitRead);
+  assert.match(WORKFLOW, /public-pages-v1-reader-\$\{GITHUB_SHA\}-lore-\$\{canonical_sha\}/);
+  assert.match(WORKFLOW, /key: \$\{\{ steps\.deployment-generation\.outputs\.generation_key \}\}/);
+  assert.match(WORKFLOW, /lookup-only: true/);
+  assert.doesNotMatch(WORKFLOW, /restore-keys:/, 'only an exact pair may match');
+  const markerWrite = WORKFLOW.match(/printf 'reader_sha=%s\\ncanonical_sha=%s\\n'[\s\S]*?> \.public-pages-deployment-marker/);
+  assert.ok(markerWrite, 'success marker contains exactly the two generation SHAs');
+  assert.doesNotMatch(markerWrite[0], /lore\/data\.json|reader-snapshot|sourceDigest|canonical bytes/i);
+});
+
+test('workflow skips all build/publication work on a marker hit and saves only after deploy success', () => {
+  for (const name of [
+    'Validate Reader',
+    'Build Pages project site',
+    'Validate Pages artifact',
+    'Configure GitHub Pages',
+    'Upload GitHub Pages artifact',
+  ]) {
+    const block = WORKFLOW.match(new RegExp(`- name: ${name}\\n([\\s\\S]*?)(?=\\n      - name:|\\n\\n  deploy:)`));
+    assert.ok(block, `${name} step exists`);
+    assert.match(block[0], /if: steps\.deployment-gate\.outputs\.deploy_required == 'true'/, `${name} is gated`);
+  }
+  assert.match(WORKFLOW, /deploy:\s*\n[\s\S]*?needs: build\s*\n\s*if: needs\.build\.outputs\.deploy_required == 'true'/);
+  const deploy = WORKFLOW.indexOf('actions/deploy-pages@v5');
+  const markerCreate = WORKFLOW.indexOf('Create successful deployment marker');
+  const markerSave = WORKFLOW.indexOf('actions/cache/save@v5');
+  assert.ok(deploy >= 0 && markerCreate > deploy && markerSave > markerCreate, 'marker save is reachable only after successful deploy');
+  assert.doesNotMatch(WORKFLOW.slice(0, deploy), /actions\/cache\/save@v5/, 'no pre-deploy marker save');
 });
 
 test('public workflow reuses only the P2R2 canonical-repo operator surface', () => {
