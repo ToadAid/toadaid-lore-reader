@@ -1,11 +1,15 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { CANONICAL_REPOSITORY, CANONICAL_PATH, FULL_SHA_RE, SOURCE_DIGEST_RE } from './provenance.ts';
 
+// Permanent identity only (Stage 2A-P2R2 §6/§7). The repository and path are
+// fixed architecture constants. The generation commit and source digest are NOT
+// pinned here — they are observed provenance that advance between Reader
+// generations. The loader accepts ANY valid generation and refuses only
+// malformed provenance form or a self-inconsistent/mixed-generation state.
 const CANONICAL = Object.freeze({
-  repository: 'ToadAid/toadaid.github.io',
-  path: 'lore/data.json',
-  commit: '464933cecb6f508a980a66d37c8a7ef7add2f53d',
-  sourceDigest: 'sha256:8635376f18805eb0677cdcfce92e8b63ce8d6f530c1fcab06e4f1348f323f984',
+  repository: CANONICAL_REPOSITORY,
+  path: CANONICAL_PATH,
 });
 
 export type ArchiveCoverState =
@@ -48,11 +52,18 @@ function readJson(path: string, name: string): Record<string, unknown> {
 }
 
 function assertProvenance(value: Record<string, unknown>, name: string): void {
+  // Permanent identity: repository and path are fixed architecture constants.
   if (value.repository !== CANONICAL.repository) fail(`${name} repository is not canonical`);
   if (value.path !== CANONICAL.path) fail(`${name} path is not canonical`);
-  if (value.commit !== CANONICAL.commit) fail(`${name} commit is not canonical`);
+  // Generation identity: commit + sourceDigest are OBSERVED PROVENANCE, not a
+  // hardcoded generation pin (Stage 2A-P2R2 §6). The loader accepts any valid
+  // generation; it refuses only malformed provenance form. The exact commit and
+  // digest are validated for self-consistency below (snapshot == LORE_SOURCE,
+  // record count, unique IDs, chronology) and — via media-reader-state — that
+  // the derived manifests belong to this same generation.
+  if (typeof value.commit !== 'string' || !FULL_SHA_RE.test(value.commit)) fail(`${name} commit provenance is malformed`);
+  if (typeof value.sourceDigest !== 'string' || !SOURCE_DIGEST_RE.test(value.sourceDigest)) fail(`${name} source digest provenance is malformed`);
   if (!Number.isInteger(value.recordCount) || (value.recordCount as number) < 1) fail(`${name} record count is invalid`);
-  if (value.sourceDigest !== CANONICAL.sourceDigest) fail(`${name} source digest is not canonical`);
 }
 
 /** Reads only importer-generated artifacts; invalid present artifacts fail closed. */

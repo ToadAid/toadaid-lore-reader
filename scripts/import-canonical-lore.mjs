@@ -89,34 +89,33 @@ export function buildSnapshot(sourceBytes, provenance, generatedAt = new Date().
   return { source, snapshot: { schemaVersion: '1.0.0', provenance: source, records: snapshotRecords } };
 }
 
-async function main() {
-  const args = parseArgs(process.argv.slice(2));
-
-  // ONE canonical load: bytes are mechanically obtained from the exact Git
-  // object `<commit>:lore/data.json` inside the local canonical repository.
-  // The caller cannot supply independent source bytes. No network, no mutation.
-  const { bytes, commit, path } = readCanonicalBytes(args['canonical-repo'], args.commit);
-
-  // Provenance identity comes from Reader constants, not the command line. The
-  // commit is the exact reviewed SHA bound above.
-  const { source, snapshot } = buildSnapshot(bytes, {
-    repository: CANONICAL_REPOSITORY,
-    path,
-    commit,
-  }, args['generated-at']);
-
-  const outputDirectory = resolve(args.output ?? 'generated');
-  await mkdir(outputDirectory, { recursive: true });
-  await writeFile(resolve(outputDirectory, 'reader-snapshot.json'), `${JSON.stringify(snapshot, null, 2)}\n`);
-  await writeFile(resolve(outputDirectory, 'LORE_SOURCE.json'), `${JSON.stringify(source, null, 2)}\n`);
+/**
+ * Build the COMPLETE derived Reader generation in memory from one canonical
+ * load, and self-validate every derived manifest against the same generation
+ * before returning. This is the reusable deterministic engine (Stage 2A-P2R2
+ * §12/§13): both the exact-commit importer CLI and the canonical-main sync
+ * command call it, so there is ONE parser, ONE schema, ONE media classifier.
+ *
+ * `bytes` must be the exact canonical source bytes (from the Git object, never
+ * caller-supplied, never the dirty working tree). `provenance` carries the
+ * permanent repository/path identity and the exact resolved commit; the digest
+ * and recordCount are mechanically computed inside buildSnapshot.
+ *
+ * Returns all four same-generation artifacts in memory:
+ *   { source, snapshot, legacyMediaCandidates, mediaInterpretation }
+ * Each manifest is built AND sealed-validated against the snapshot before
+ * return, so a caller that writes them atomically cannot emit mixed-generation
+ * or inconsistent state.
+ */
+export function buildGenerationArtifacts(bytes, provenance, generatedAt = new Date().toISOString()) {
+  const { source, snapshot } = buildSnapshot(bytes, provenance, generatedAt);
 
   // Derived legacy-media candidate manifest, from the SAME canonical load,
-  // provenance, and snapshot generation. Build then self-validate before
-  // writing so the generated output is provably consistent. No network, no
-  // media fetching; derived solely from the exact canonical bytes.
-  const candidateManifest = buildLegacyMediaCandidateManifest(snapshot.records, source);
-  validateLegacyMediaCandidateManifest(candidateManifest, snapshot);
-  await writeFile(resolve(outputDirectory, 'legacy-media-candidates.json'), `${JSON.stringify(candidateManifest, null, 2)}\n`);
+  // provenance, and snapshot generation. Build then self-validate so the
+  // generated output is provably consistent. No network, no media fetching;
+  // derived solely from the exact canonical bytes.
+  const legacyMediaCandidates = buildLegacyMediaCandidateManifest(snapshot.records, source);
+  validateLegacyMediaCandidateManifest(legacyMediaCandidates, snapshot);
 
   // Derived media-interpretation manifest (Stage 2A-P2M1), from the SAME
   // canonical load and snapshot generation. Classification only: it derives a
@@ -124,9 +123,53 @@ async function main() {
   // media references in `original`, WITHOUT preservation, downloading,
   // rendering, artifact admission, or canonical mutation. The sealed P2
   // candidate manifest above is unchanged; this is a separate derived layer.
-  const interpretationManifest = buildMediaInterpretationManifest(snapshot.records, source);
-  validateMediaInterpretationManifest(interpretationManifest, snapshot);
-  await writeFile(resolve(outputDirectory, 'media-interpretation.json'), `${JSON.stringify(interpretationManifest, null, 2)}\n`);
+  const mediaInterpretation = buildMediaInterpretationManifest(snapshot.records, source);
+  validateMediaInterpretationManifest(mediaInterpretation, snapshot);
+
+  return { source, snapshot, legacyMediaCandidates, mediaInterpretation };
+}
+
+/** The four generated files of one Reader generation, in publication order. */
+export const GENERATION_FILES = [
+  'reader-snapshot.json',
+  'LORE_SOURCE.json',
+  'legacy-media-candidates.json',
+  'media-interpretation.json',
+];
+
+/** Write a complete in-memory generation to `outputDirectory`. Creates the
+ *  directory. Each file is written as pretty JSON + trailing newline, matching
+ *  the importer's historical byte form. Used by the exact-commit importer CLI;
+ *  the canonical-main sync command writes to a temporary candidate directory
+ *  with this helper then publishes transactionally. */
+export async function writeGenerationArtifacts(artifacts, outputDirectory) {
+  await mkdir(outputDirectory, { recursive: true });
+  await writeFile(resolve(outputDirectory, 'reader-snapshot.json'), `${JSON.stringify(artifacts.snapshot, null, 2)}\n`);
+  await writeFile(resolve(outputDirectory, 'LORE_SOURCE.json'), `${JSON.stringify(artifacts.source, null, 2)}\n`);
+  await writeFile(resolve(outputDirectory, 'legacy-media-candidates.json'), `${JSON.stringify(artifacts.legacyMediaCandidates, null, 2)}\n`);
+  await writeFile(resolve(outputDirectory, 'media-interpretation.json'), `${JSON.stringify(artifacts.mediaInterpretation, null, 2)}\n`);
+}
+
+async function main() {
+  const args = parseArgs(process.argv.slice(2));
+
+  // ONE canonical load: bytes are mechanically obtained from the exact Git
+  // object `<commit>:lore/data.json` inside the local canonical repository.
+  // The caller cannot supply independent source bytes. No mutation (this
+  // primitive never fetches; a missing local commit is refused).
+  const { bytes, commit, path } = readCanonicalBytes(args['canonical-repo'], args.commit);
+
+  // Provenance identity comes from Reader constants, not the command line. The
+  // commit is the exact reviewed SHA bound above; digest + recordCount are
+  // mechanically computed inside buildSnapshot.
+  const artifacts = buildGenerationArtifacts(bytes, {
+    repository: CANONICAL_REPOSITORY,
+    path,
+    commit,
+  }, args['generated-at']);
+
+  const outputDirectory = resolve(args.output ?? 'generated');
+  await writeGenerationArtifacts(artifacts, outputDirectory);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
