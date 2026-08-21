@@ -4,6 +4,7 @@ import { loadGeneratedArchive } from '../../lib/lore/archive-cover-state';
 import { orderedRecords, recordRoute } from '../../lib/lore/reader-model';
 import { renderMarkdown } from '../../lib/lore/markdown';
 import { loadMediaReaderState, renderItemsForRecord, mediaKindLabel, type MediaRenderItem } from '../../lib/lore/media-reader-state';
+import { publicPath } from '../../lib/public-site';
 
 // Stage 2A-P2M2 — Historical Media rendering. The generated archive is proven
 // against canonical constants by loadGeneratedArchive(); the generated media
@@ -28,13 +29,14 @@ const hasOriginal = typeof record.canonical.original === 'string' && record.cano
 const originalHtml = hasOriginal ? renderMarkdown(record.canonical.original as string) : '';
 const commentaryHtml = renderMarkdown(record.canonical.comment);
 const sourceUrl = typeof record.canonical.url === 'string' && record.canonical.url.length > 0 ? record.canonical.url : null;
+const publicBase = import.meta.env.BASE_URL;
 ---
 <!doctype html><html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>{record.canonical.title} · The Pond Archive</title></head>
-<body><main class="chapter-shell"><header class="reader-header"><a href="/chronicle/">← RIPPLE CHRONICLE</a><span><a href="/bookmarks/">Bookmarks</a> · THE POND ARCHIVE</span></header><article class="chapter-article">
+<body><main class="chapter-shell"><header class="reader-header"><a href={publicPath('/chronicle/', publicBase)}>← RIPPLE CHRONICLE</a><span><a href={publicPath('/bookmarks/', publicBase)}>Bookmarks</a> · THE POND ARCHIVE</span></header><article class="chapter-article">
 <p class="kicker">ARCHIVE DATE · {record.chronology.archiveChronologyMarker}</p>
 <h1>{record.canonical.title}</h1>
 <p class="canonical-id">◉ CANONICAL RECORD · {record.canonicalId}</p>
-<div class="record-actions">{!hasOriginal && sourceUrl ? <a class="source-link source-link--top" href={sourceUrl} target="_blank" rel="noreferrer">Source ↗</a> : null}<button type="button" class="record-action" data-bookmark-id={record.canonicalId} aria-pressed="false" aria-label={`Bookmark ${record.canonical.title}`}>Bookmark</button><button type="button" class="record-action" data-share-url={recordRoute(record.canonicalId)} aria-label="Share this record">Share</button><span class="record-action-status" data-share-status="" role="status"></span></div>
+<div class="record-actions">{!hasOriginal && sourceUrl ? <a class="source-link source-link--top" href={sourceUrl} target="_blank" rel="noreferrer">Source ↗</a> : null}<button type="button" class="record-action" data-bookmark-id={record.canonicalId} aria-pressed="false" aria-label={`Bookmark ${record.canonical.title}`}>Bookmark</button><button type="button" class="record-action" data-share-url={recordRoute(record.canonicalId, publicBase)} aria-label="Share this record">Share</button><span class="record-action-status" data-share-status="" role="status"></span></div>
 <div class="mode-controls" role="group" aria-label="Reading mode">{hasOriginal ? <button type="button" data-mode="original" aria-pressed="false">Original</button> : null}<button type="button" data-mode="commentary" aria-pressed="false">Commentary</button><button type="button" data-mode="both" aria-pressed="true">Both</button></div>
 
 {hasOriginal ? <section class="original-folio" data-evidence-section="original" aria-label="Original Record"><p class="folio-label">Original Record</p><div class="folio-body folio-body--source" set:html={originalHtml} />{sourceUrl ? <p class="folio-source"><a class="source-link" href={sourceUrl} target="_blank" rel="noreferrer">Source ↗</a></p> : null}</section> : null}
@@ -45,7 +47,7 @@ const sourceUrl = typeof record.canonical.url === 'string' && record.canonical.u
 
 <details class="evidence"><summary>Evidence Lens</summary><div><h2>Record-level evidence</h2><dl><dt>Canonical record ID</dt><dd>{record.canonicalId}</dd><dt>Archive date</dt><dd>{record.chronology.archiveChronologyMarker} — chronology marker, not asserted publication timestamp.</dd><dt>Title</dt><dd>{record.canonical.title}</dd>{sourceUrl ? <><dt>Source URL</dt><dd class="break"><a href={sourceUrl} target="_blank" rel="noreferrer">{sourceUrl}</a></dd></> : null}</dl><h2>Snapshot-level provenance</h2><dl><dt>Repository</dt><dd>{provenance.repository}</dd><dt>Path</dt><dd>{provenance.path}</dd><dt>Commit</dt><dd class="break">{provenance.commit}</dd><dt>Source digest</dt><dd class="break">{provenance.sourceDigest}</dd><dt>Record count</dt><dd>{provenance.recordCount}</dd></dl></div></details>
 
-<nav class="chapter-nav" aria-label="Chronological record navigation">{previous ? <a href={recordRoute(previous.canonicalId)}>← Previous record</a> : <span />}{next ? <a href={recordRoute(next.canonicalId)}>Next record →</a> : <span />}</nav>{!next ? <p class="continues">The Lore Continues…</p> : null}</article></main><script is:inline>
+<nav class="chapter-nav" aria-label="Chronological record navigation">{previous ? <a href={recordRoute(previous.canonicalId, publicBase)}>← Previous record</a> : <span />}{next ? <a href={recordRoute(next.canonicalId, publicBase)}>Next record →</a> : <span />}</nav>{!next ? <p class="continues">The Lore Continues…</p> : null}</article></main><script is:inline>
 // Stage 2A-P2M2 — reading-mode + Historical Media runtime. Real executable
 // statements (NOT a template-literal expression): authored directly so the
 // built HTML contains runnable JavaScript, not an inert `{`...`}` string.

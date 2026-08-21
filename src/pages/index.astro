@@ -1,9 +1,15 @@
 ---
 import '../styles/pond-archive.css';
 import { loadArchiveCoverState } from '../lib/lore/archive-cover-state';
+import { publicPath } from '../lib/public-site';
 
 const archive = loadArchiveCoverState();
 const verified = archive.status === 'verified';
+const publicBase = import.meta.env.BASE_URL;
+const coverStyle = [
+  `--archive-cover-desktop: url("${publicPath('/art/pond-archive/cover-desktop.png', publicBase)}")`,
+  `--archive-cover-mobile: url("${publicPath('/art/pond-archive/cover-mobile.png', publicBase)}")`,
+].join(';');
 ---
 
 <!doctype html>
@@ -15,7 +21,7 @@ const verified = archive.status === 'verified';
     <title>The Pond Archive · ToadAid Lore Reader</title>
   </head>
   <body>
-    <main class="archive-cover">
+    <main class="archive-cover" style={coverStyle}>
       <div class="moon" aria-hidden="true"></div>
       <div class="ripple ripple-one" aria-hidden="true"></div>
       <div class="ripple ripple-two" aria-hidden="true"></div>
@@ -40,7 +46,7 @@ const verified = archive.status === 'verified';
           <section class="archive-state verified-state" aria-label="Verified canonical archive state">
             <p class="record-count">{archive.recordCount} records preserved</p>
             <p class="snapshot-status"><span class="status-dot" aria-hidden="true"></span> Canonical snapshot <code aria-label={`Canonical commit ${archive.canonicalCommit}`}>{archive.canonicalCommit.slice(0, 9)}…</code></p>
-            <a class="enter-archive" href="/chronicle/">Enter the Archive <span aria-hidden="true">→</span></a>
+            <a class="enter-archive" href={publicPath('/chronicle/', publicBase)}>Enter the Archive <span aria-hidden="true">→</span></a>
           </section>
         ) : (
           <p class="snapshot-status unavailable-state"><span class="status-dot" aria-hidden="true"></span> Awaiting a verified canonical snapshot</p>

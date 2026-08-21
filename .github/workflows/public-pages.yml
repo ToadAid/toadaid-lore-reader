@@ -1,0 +1,129 @@
+name: Public Pages
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# GitHub Pages recommends allowing an active production deployment to finish.
+# The shared group still skips obsolete queued runs and prevents deployment races.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: sync, validate, and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      deploy_required: ${{ steps.deployment-gate.outputs.deploy_required }}
+      generation_key: ${{ steps.deployment-generation.outputs.generation_key }}
+      reader_sha: ${{ steps.deployment-generation.outputs.reader_sha }}
+      canonical_sha: ${{ steps.deployment-generation.outputs.canonical_sha }}
+    steps:
+      - name: Checkout Reader
+        uses: actions/checkout@v6
+      - name: Checkout canonical lore repository
+        uses: actions/checkout@v6
+        with:
+          repository: ToadAid/toadaid.github.io
+          path: canonical-lore
+          persist-credentials: false
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+      - name: Sync canonical main through P2R2
+        run: npm run sync:canonical -- --canonical-repo "$GITHUB_WORKSPACE/canonical-lore"
+      - name: Resolve exact deployment generation
+        id: deployment-generation
+        shell: bash
+        run: |
+          set -uo pipefail
+          canonical_sha="$(node --input-type=module -e "import { readFileSync } from 'node:fs'; const p = JSON.parse(readFileSync('generated/LORE_SOURCE.json', 'utf8')); if (typeof p.commit !== 'string') process.exit(1); process.stdout.write(p.commit);")"
+          if [[ ! "$canonical_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            printf 'Generated canonical commit is malformed: %s\n' "$canonical_sha" >&2
+            exit 1
+          fi
+          generation_key="public-pages-v1-reader-${GITHUB_SHA}-lore-${canonical_sha}"
+          printf 'reader_sha=%s\n' "$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          printf 'canonical_sha=%s\n' "$canonical_sha" >> "$GITHUB_OUTPUT"
+          printf 'generation_key=%s\n' "$generation_key" >> "$GITHUB_OUTPUT"
+      - name: Look up successful deployment marker
+        id: deployment-marker
+        uses: actions/cache/restore@v5
+        with:
+          path: .public-pages-deployment-marker
+          key: ${{ steps.deployment-generation.outputs.generation_key }}
+          lookup-only: true
+      - name: Decide whether deployment is required
+        id: deployment-gate
+        shell: bash
+        run: |
+          set -uo pipefail
+          if [ "${{ steps.deployment-marker.outputs.cache-hit }}" = "true" ]; then
+            printf 'deploy_required=false\n' >> "$GITHUB_OUTPUT"
+            printf 'Exact Reader+Lore generation was already deployed successfully; skipping build and deploy.\n'
+          else
+            printf 'deploy_required=true\n' >> "$GITHUB_OUTPUT"
+            printf 'No successful marker for this exact Reader+Lore generation; deployment required.\n'
+          fi
+      - name: Validate Reader
+        if: steps.deployment-gate.outputs.deploy_required == 'true'
+        run: npm test
+      - name: Build Pages project site
+        if: steps.deployment-gate.outputs.deploy_required == 'true'
+        env:
+          PUBLIC_SITE: https://toadaid.github.io
+          PUBLIC_BASE: /toadaid-lore-reader/
+        run: npm run build
+      - name: Validate Pages artifact
+        if: steps.deployment-gate.outputs.deploy_required == 'true'
+        run: node scripts/validate-public-build.mjs --dir dist --base /toadaid-lore-reader/
+      - name: Configure GitHub Pages
+        if: steps.deployment-gate.outputs.deploy_required == 'true'
+        uses: actions/configure-pages@v6
+      - name: Upload GitHub Pages artifact
+        if: steps.deployment-gate.outputs.deploy_required == 'true'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+
+  deploy:
+    name: deploy
+    needs: build
+    if: needs.build.outputs.deploy_required == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
+      - name: Create successful deployment marker
+        shell: bash
+        run: |
+          set -uo pipefail
+          printf 'reader_sha=%s\ncanonical_sha=%s\n' \
+            "${{ needs.build.outputs.reader_sha }}" \
+            "${{ needs.build.outputs.canonical_sha }}" \
+            > .public-pages-deployment-marker
+      - name: Save successful deployment marker
+        uses: actions/cache/save@v5
+        with:
+          path: .public-pages-deployment-marker
+          key: ${{ needs.build.outputs.generation_key }}

@@ -40,7 +40,7 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
 .chronicle-shell::before {
   z-index: -2;
   height: min(76rem, 116vw);
-  background: #07100e url('/art/pond-archive/pond-archive-lotus-moon.png') top center / min(78rem, 100vw) auto no-repeat;
+  background: #07100e var(--chronicle-art) top center / min(78rem, 100vw) auto no-repeat;
 }
 .chronicle-shell::after {
   z-index: -1;
