@@ -34,6 +34,7 @@
 ## P3 — PWA / Offline
 
 - [x] Verified Offline PWA Archive (Stage 2A-PWA1): public builds explicitly admitted with `PUBLIC_PWA=1` emit a base-aware manifest and bounded service worker. The service worker precaches only the complete same-origin generated Reader, keyed by exact Reader SHA + canonical SHA; it never fetches canonical source or third-party media. Existing Pond Archive artwork supplies documented deterministic 192px and 512px installation icon derivatives. Default/local and desktop builds do not register PWA behavior.
+- [x] Mobile PWA install and offline readiness (Stage 2A-MOB1): PWA implementation and mobile structural readiness are complete, including explicit iOS home-screen metadata and generated-artifact precache closure/accounting. iOS, Android, and tablet real-device dogfood remain pending.
 
 ## Desktop Distribution
 

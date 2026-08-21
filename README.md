@@ -90,6 +90,8 @@ and `pwa-icon-512.png` installation icons are derivatives of the existing
 repository-owned `pond-archive-lotus-moon.png` artwork. Ordinary local and
 Electron builds do not register a service worker.
 
+Mobile structural readiness is complete; see [the pending iOS/iPadOS and Android real-device acceptance ceremony](docs/mobile-pwa-real-device-acceptance.md). No native mobile application is introduced.
+
 ## Linux packaged offline Reader
 
 After a governed canonical sync and ordinary `npm run build`, create the
