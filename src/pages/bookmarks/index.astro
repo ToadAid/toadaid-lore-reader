@@ -1,0 +1,102 @@
+---
+import '../../styles/reader.css';
+import { loadGeneratedArchive } from '../../lib/lore/archive-cover-state';
+import { orderedRecords, recordRoute } from '../../lib/lore/reader-model';
+
+// Stage 2A-P2U1 — /bookmarks/ view. This route ALWAYS builds, even on a clean
+// checkout with no generated archive (it then renders an honest archive-
+// unavailable state and never fails the build). The current verified archive is
+// the only authority for current record metadata: the server projects the verified
+// records into a build-time-derived JSON map of { canonicalId, title, route } and
+// emits it into the built HTML. Browser runtime resolves the browser-local saved
+// canonical IDs (ordered) against that projection. No bookmark persistence is
+// written here; this view only reads browser-local state and resolves it.
+const archive = loadGeneratedArchive();
+const archiveAvailable = archive.status === 'verified';
+const records = archiveAvailable
+  ? orderedRecords(archive.records).map((r) => ({ canonicalId: r.canonicalId, title: r.canonical.title, route: recordRoute(r.canonicalId) }))
+  : [];
+const archiveJson = JSON.stringify(records);
+---
+<!doctype html><html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>Bookmarks · The Pond Archive</title></head>
+<body><main class="reader-shell bookmarks-shell"><header class="reader-header"><a href="/chronicle/">← RIPPLE CHRONICLE</a><span><a href="/">THE POND ARCHIVE</a></span></header>
+<section class="bookmarks-section">
+<h1>Bookmarks</h1>
+{archiveAvailable ? null : <p class="bookmarks-archive-unavailable">Awaiting a verified canonical snapshot. Your saved bookmark IDs are kept only in your browser; they will resolve into records once an archive is available.</p>}
+<p class="bookmarks-status" data-bookmark-status="">Bookmarks are stored only in your browser, keyed by canonical record ID.</p>
+<ul class="bookmarks-list" data-bookmark-list=""></ul>
+</section>
+<span data-bookmark-archive={archiveJson} hidden aria-hidden="true" />
+</main><script is:inline>
+// Stage 2A-P2U1 — /bookmarks/ runtime. Resolves browser-local saved canonical IDs
+// against the current verified archive projection (build-time derived, never
+// persisted to storage). Safe text handling only — never innerHTML from storage.
+try { (function () {
+  var KEY = 'toadaid:lore-reader:bookmarks:v1';
+  var archiveEl = document.querySelector('[data-bookmark-archive]');
+  var archive = [];
+  try { if (archiveEl) archive = JSON.parse(archiveEl.dataset.bookmarkArchive || '[]'); } catch (e) { archive = []; }
+  var byId = {};
+  if (Array.isArray(archive)) {
+    for (var i = 0; i < archive.length; i++) {
+      var r = archive[i];
+      if (r && typeof r.canonicalId === 'string') byId[r.canonicalId] = r;
+    }
+  }
+  function readIds() {
+    var raw;
+    try { if (typeof localStorage === 'undefined' || !localStorage) return { ok: false, reason: 'unavailable' }; raw = localStorage.getItem(KEY); }
+    catch (e) { return { ok: false, reason: 'unavailable' }; }
+    if (raw === null) return { ok: true, ids: [] };
+    try { var p = JSON.parse(raw); } catch (e) { return { ok: false, reason: 'corrupt' }; }
+    if (!Array.isArray(p)) return { ok: false, reason: 'corrupt' };
+    var seen = {};
+    for (var j = 0; j < p.length; j++) {
+      if (typeof p[j] !== 'string' || p[j].length === 0) return { ok: false, reason: 'corrupt' };
+      if (Object.prototype.hasOwnProperty.call(seen, p[j])) return { ok: false, reason: 'corrupt' };
+      seen[p[j]] = true;
+    }
+    return { ok: true, ids: p };
+  }
+  var list = document.querySelector('[data-bookmark-list]');
+  var status = document.querySelector('[data-bookmark-status]');
+  if (!list || !status) return;
+  function text(el, t) { if (el) el.textContent = t; }
+  var result = readIds();
+  if (!result.ok) {
+    if (result.reason === 'corrupt') text(status, 'Saved bookmarks could not be read (storage is corrupt). Showing nothing while storage remains unreadable.');
+    else text(status, 'Saved bookmarks are unavailable (storage is disabled or blocked).');
+    return;
+  }
+  var ids = result.ids;
+  if (ids.length === 0) { text(status, 'No bookmarks saved yet.'); return; }
+  text(status, ids.length + ' bookmark' + (ids.length === 1 ? '' : 's') + ' saved.');
+  for (var k = 0; k < ids.length; k++) {
+    var id = ids[k];
+    var li = document.createElement('li');
+    li.className = 'bookmarks-item';
+    var rec = byId[id];
+    if (rec) {
+      var a = document.createElement('a');
+      a.className = 'bookmarks-link';
+      a.href = rec.route;
+      a.textContent = rec.title;
+      var small = document.createElement('small');
+      small.className = 'bookmarks-id';
+      small.textContent = id;
+      li.appendChild(a);
+      li.appendChild(small);
+    } else {
+      var p = document.createElement('p');
+      p.className = 'bookmarks-missing';
+      p.textContent = 'Saved record unavailable in this archive';
+      var code = document.createElement('code');
+      code.className = 'bookmarks-id';
+      code.textContent = id;
+      li.appendChild(p);
+      li.appendChild(code);
+    }
+    list.appendChild(li);
+  }
+})(); } catch (e) { /* bookmarks runtime must never break the page */ }
+</script></body></html>
