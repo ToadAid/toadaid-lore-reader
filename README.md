@@ -89,3 +89,16 @@ intentionally excluded. The deterministic `public/art/pond-archive/pwa-icon-192.
 and `pwa-icon-512.png` installation icons are derivatives of the existing
 repository-owned `pond-archive-lotus-moon.png` artwork. Ordinary local and
 Electron builds do not register a service worker.
+
+## Linux packaged offline Reader
+
+After a governed canonical sync and ordinary `npm run build`, create the
+read-only Linux x64 portable application with:
+
+```sh
+npm run desktop:package:linux
+```
+
+The disposable `release/The Pond Archive-linux-x64/` directory is an
+end-user Reader only: it contains the verified static generation and no lore
+sync control, canonical checkout, Node/npm requirement, or PWA runtime.

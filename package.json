@@ -11,9 +11,11 @@
     "sync:canonical": "node scripts/sync-canonical-lore.mjs",
     "desktop": "electron desktop/main.mjs",
     "desktop:dev": "npm run build && electron desktop/main.mjs",
-    "desktop:test": "node --test desktop/*.test.mjs"
+    "desktop:test": "node --test desktop/*.test.mjs",
+    "desktop:package:linux": "node scripts/package-desktop.mjs"
   },
   "devDependencies": {
+    "@electron/packager": "20.3.0",
     "astro": "^7.2.4",
     "electron": "^43.4.1",
     "typescript": "^5.9.0"

@@ -35,6 +35,10 @@
 
 - [x] Verified Offline PWA Archive (Stage 2A-PWA1): public builds explicitly admitted with `PUBLIC_PWA=1` emit a base-aware manifest and bounded service worker. The service worker precaches only the complete same-origin generated Reader, keyed by exact Reader SHA + canonical SHA; it never fetches canonical source or third-party media. Existing Pond Archive artwork supplies documented deterministic 192px and 512px installation icon derivatives. Default/local and desktop builds do not register PWA behavior.
 
+## Desktop Distribution
+
+- [x] Packaged read-only Linux x64 runtime (Stage 2A-DESK2-P1): `npm run desktop:package:linux` stages only the built non-PWA Reader plus the minimal Electron host/navigation/single-instance modules, then produces a disposable portable application under `release/`. This end-user mode has no sync overlay, repository chooser, preload, IPC, canonical Git/source, or Node/npm/source-checkout dependency.
+
 ## P4 — Interactive Study
 
 - [ ] Not started.
