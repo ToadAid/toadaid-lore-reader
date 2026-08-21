@@ -2,6 +2,7 @@
 import '../../styles/reader.css';
 import { loadGeneratedArchive } from '../../lib/lore/archive-cover-state';
 import { orderedRecords, recordRoute } from '../../lib/lore/reader-model';
+import { publicPath } from '../../lib/public-site';
 
 // Stage 2A-P2U1 — /bookmarks/ view. This route ALWAYS builds, even on a clean
 // checkout with no generated archive (it then renders an honest archive-
@@ -13,13 +14,14 @@ import { orderedRecords, recordRoute } from '../../lib/lore/reader-model';
 // written here; this view only reads browser-local state and resolves it.
 const archive = loadGeneratedArchive();
 const archiveAvailable = archive.status === 'verified';
+const publicBase = import.meta.env.BASE_URL;
 const records = archiveAvailable
-  ? orderedRecords(archive.records).map((r) => ({ canonicalId: r.canonicalId, title: r.canonical.title, route: recordRoute(r.canonicalId) }))
+  ? orderedRecords(archive.records).map((r) => ({ canonicalId: r.canonicalId, title: r.canonical.title, route: recordRoute(r.canonicalId, publicBase) }))
   : [];
 const archiveJson = JSON.stringify(records);
 ---
 <!doctype html><html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>Bookmarks · The Pond Archive</title></head>
-<body><main class="reader-shell bookmarks-shell"><header class="reader-header"><a href="/chronicle/">← RIPPLE CHRONICLE</a><span><a href="/">THE POND ARCHIVE</a></span></header>
+<body><main class="reader-shell bookmarks-shell"><header class="reader-header"><a href={publicPath('/chronicle/', publicBase)}>← RIPPLE CHRONICLE</a><span><a href={publicPath('/', publicBase)}>THE POND ARCHIVE</a></span></header>
 <section class="bookmarks-section">
 <h1>Bookmarks</h1>
 {archiveAvailable ? null : <p class="bookmarks-archive-unavailable">Awaiting a verified canonical snapshot. Your saved bookmark IDs are kept only in your browser; they will resolve into records once an archive is available.</p>}

@@ -290,9 +290,9 @@ const flush = () => new Promise<void>((r) => setTimeout(r, 0));
 
 test('15: the record page contains a bookmark control bound to canonicalId and a share control bound to the recordRoute path', () => {
   assert.match(RECORD_PAGE_SRC, /data-bookmark-id=\{record\.canonicalId\}/, 'bookmark control bound to canonicalId');
-  assert.match(RECORD_PAGE_SRC, /data-share-url=\{recordRoute\(record\.canonicalId\)\}/, 'share control bound to the recordRoute path');
+  assert.match(RECORD_PAGE_SRC, /data-share-url=\{recordRoute\(record\.canonicalId, publicBase\)\}/, 'share control bound to the base-aware recordRoute path');
   assert.match(RECORD_PAGE_SRC, /aria-pressed="false"/, 'bookmark control carries an initial aria-pressed');
-  assert.match(RECORD_PAGE_SRC, /href="\/bookmarks\/"/, 'record page links to the /bookmarks/ view');
+  assert.match(RECORD_PAGE_SRC, /href=\{publicPath\('\/bookmarks\/', publicBase\)\}/, 'record page links to the base-aware /bookmarks/ view');
 });
 
 test('16: the record-page bookmark runtime toggles aria-pressed and persists only an ordered ID array', () => {
@@ -419,6 +419,16 @@ test('25: native Web Share is preferred when present and the payload is the reco
   assert.ok(shared, 'navigator.share was called');
   assert.equal(shared.url, 'https://reader.test/record/M_YT/', 'payload is the absolute record URL');
   assert.ok(!('text' in shared) && !('title' in shared), 'no lore title/text body in the share payload');
+});
+
+test('25a: Pages-base Share produces the actual public project-site record URL', async () => {
+  let shared: any = null;
+  const navigator: any = { share: (payload: any) => { shared = payload; return Promise.resolve(); } };
+  const shareBtn = makeEl({ dataset: { shareUrl: '/toadaid-lore-reader/record/M_YT/' } });
+  const runtime = runRecordRuntime({ shareBtn, navigator, location: { origin: 'https://toadaid.github.io' } });
+  runtime.shareBtn._listeners.click();
+  await flush();
+  assert.equal(shared.url, 'https://toadaid.github.io/toadaid-lore-reader/record/M_YT/');
 });
 
 test('26: AbortError (user dismissal) never triggers a surprise clipboard copy', async () => {
