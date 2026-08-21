@@ -30,11 +30,11 @@ const commentaryHtml = renderMarkdown(record.canonical.comment);
 const sourceUrl = typeof record.canonical.url === 'string' && record.canonical.url.length > 0 ? record.canonical.url : null;
 ---
 <!doctype html><html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>{record.canonical.title} · The Pond Archive</title></head>
-<body><main class="chapter-shell"><header class="reader-header"><a href="/chronicle/">← RIPPLE CHRONICLE</a><span>THE POND ARCHIVE</span></header><article class="chapter-article">
+<body><main class="chapter-shell"><header class="reader-header"><a href="/chronicle/">← RIPPLE CHRONICLE</a><span><a href="/bookmarks/">Bookmarks</a> · THE POND ARCHIVE</span></header><article class="chapter-article">
 <p class="kicker">ARCHIVE DATE · {record.chronology.archiveChronologyMarker}</p>
 <h1>{record.canonical.title}</h1>
 <p class="canonical-id">◉ CANONICAL RECORD · {record.canonicalId}</p>
-{!hasOriginal && sourceUrl ? <p><a class="source-link source-link--top" href={sourceUrl} target="_blank" rel="noreferrer">Source ↗</a></p> : null}
+<div class="record-actions">{!hasOriginal && sourceUrl ? <a class="source-link source-link--top" href={sourceUrl} target="_blank" rel="noreferrer">Source ↗</a> : null}<button type="button" class="record-action" data-bookmark-id={record.canonicalId} aria-pressed="false" aria-label={`Bookmark ${record.canonical.title}`}>Bookmark</button><button type="button" class="record-action" data-share-url={recordRoute(record.canonicalId)} aria-label="Share this record">Share</button><span class="record-action-status" data-share-status="" role="status"></span></div>
 <div class="mode-controls" role="group" aria-label="Reading mode">{hasOriginal ? <button type="button" data-mode="original" aria-pressed="false">Original</button> : null}<button type="button" data-mode="commentary" aria-pressed="false">Commentary</button><button type="button" data-mode="both" aria-pressed="true">Both</button></div>
 
 {hasOriginal ? <section class="original-folio" data-evidence-section="original" aria-label="Original Record"><p class="folio-label">Original Record</p><div class="folio-body folio-body--source" set:html={originalHtml} />{sourceUrl ? <p class="folio-source"><a class="source-link" href={sourceUrl} target="_blank" rel="noreferrer">Source ↗</a></p> : null}</section> : null}
@@ -57,4 +57,76 @@ document.querySelectorAll('.media-yt-load').forEach((btn) => { btn.addEventListe
 // Inline images: graceful fallback to the external reference link when the
 // remote asset does not load. No build-time fetch; this only reacts at runtime.
 document.querySelectorAll('[data-media-img]').forEach((img) => { const reveal = () => { img.hidden = true; const fb = document.getElementById(img.dataset.fallbackId); if (fb) fb.hidden = false; }; img.addEventListener('error', reveal); if (img.complete && img.naturalWidth === 0) reveal(); });
+// Stage 2A-P2U1 — Lore bookmark runtime. Browser-local localStorage only; stores
+// only an ordered array of canonicalId strings (no title/content/provenance). Never
+// throws and never breaks ordinary reading when storage is disabled/corrupt.
+try { (function () {
+  var KEY = 'toadaid:lore-reader:bookmarks:v1';
+  function readIds() {
+    var raw;
+    try { if (typeof localStorage === 'undefined' || !localStorage) return null; raw = localStorage.getItem(KEY); }
+    catch (e) { return null; }
+    if (raw === null) return [];
+    try { var p = JSON.parse(raw); } catch (e) { return null; }
+    if (!Array.isArray(p)) return null;
+    var seen = {};
+    for (var i = 0; i < p.length; i++) {
+      if (typeof p[i] !== 'string' || p[i].length === 0) return null;
+      if (Object.prototype.hasOwnProperty.call(seen, p[i])) return null;
+      seen[p[i]] = true;
+    }
+    return p;
+  }
+  var btn = document.querySelector('[data-bookmark-id]');
+  if (!btn) return;
+  var id = btn.dataset.bookmarkId;
+  function reflect() {
+    var ids = readIds();
+    if (ids === null) { btn.setAttribute('aria-pressed', 'false'); btn.setAttribute('disabled', ''); btn.classList.add('is-degraded'); return; }
+    btn.removeAttribute('disabled');
+    btn.classList.remove('is-degraded');
+    btn.setAttribute('aria-pressed', String(ids.indexOf(id) !== -1));
+  }
+  reflect();
+  btn.addEventListener('click', function () {
+    var ids = readIds();
+    if (ids === null) return; // corrupt/unavailable: do not overwrite, do not claim success
+    var next = ids.indexOf(id) === -1 ? ids.concat([id]) : ids.filter(function (e) { return e !== id; });
+    try { localStorage.setItem(KEY, JSON.stringify(next)); } catch (e) { return; } // write failed: no false success
+    reflect();
+  });
+})(); } catch (e) { /* bookmark runtime must never break reading */ }
+// Stage 2A-P2U1 — individual-record Share. Prefers the native Web Share API; falls
+// back to Copy Link. Sends ONLY the record URL — never canonical lore text or
+// commentary. AbortError (user dismissal) never triggers a surprise clipboard copy.
+try { (function () {
+  var btn = document.querySelector('[data-share-url]');
+  if (!btn) return;
+  function status(text) { var s = document.querySelector('[data-share-status]'); if (s) s.textContent = text; }
+  btn.addEventListener('click', function () {
+    var path = btn.dataset.shareUrl;
+    if (!path) return;
+    var origin = (typeof location !== 'undefined' && location && location.origin) ? location.origin : '';
+    var url = origin + path;
+    function copyFallback() {
+      try {
+        if (typeof navigator === 'undefined' || !navigator || !navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') { status('Copy unavailable'); return; }
+        var p = navigator.clipboard.writeText(url);
+        if (p && typeof p.then === 'function') { p.then(function () { status('Link copied'); }, function () { status('Copy unavailable'); }); }
+        else { status('Link copied'); }
+      } catch (e) { status('Copy unavailable'); }
+    }
+    if (typeof navigator !== 'undefined' && navigator && typeof navigator.share === 'function') {
+      var sp = navigator.share({ url: url });
+      if (sp && typeof sp.then === 'function') {
+        sp.then(function () { /* shared or dismissed; no clipboard copy after a share attempt */ }, function (err) {
+          if (err && err.name === 'AbortError') return; // user cancelled: never surprise-copy
+          copyFallback(); // a non-Abort failure may fall back to copy
+        });
+      }
+      return;
+    }
+    copyFallback();
+  });
+})(); } catch (e) { /* share runtime must never break reading */ }
 </script></body></html>

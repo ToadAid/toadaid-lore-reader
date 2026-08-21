@@ -285,6 +285,38 @@ time, small { color: #a6bca9; font-size: .75rem; }
 /* media reference links reuse .source-link; keep long URLs from overflowing */
 .historical-media .source-link { max-width: 100%; overflow-wrap: anywhere; word-break: break-word; }
 
+/* ───────────────────────── Bookmark + Share affordances ─────────────────────────
+   Stage 2A-P2U1 — restrained, personal Reader-runtime controls. Same dark archival
+   surface as the folios; no redesign. Bookmark/Share reuse the .source-link border
+   language so they sit with existing controls rather than shouting. */
+.record-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin: 1.5rem 0 0; }
+.record-actions .source-link--top { margin: 0; }
+.record-action {
+  border: 1px solid #497963;
+  border-radius: .25rem;
+  background: rgba(10, 29, 22, .75);
+  padding: .5rem .7rem;
+  color: #dce8dd;
+  font: inherit;
+  font-size: .82rem;
+  cursor: pointer;
+}
+.record-action[aria-pressed='true'] { border-color: #9be9ba; background: #1e4936; }
+.record-action.is-degraded { opacity: .55; cursor: not-allowed; }
+.record-action-status { font-size: .78rem; color: #a6bca9; min-width: 0; }
+
+/* ───────────────────────── /bookmarks/ view ───────────────────────── */
+.bookmarks-section { max-width: 46rem; margin: 4rem auto; }
+.bookmarks-section h1 { font: 400 clamp(2.4rem, 7vw, 4.6rem)/.95 Georgia, serif; margin: .6rem 0; }
+.bookmarks-status { color: #b5c9b9; font-size: .9rem; margin: 0 0 1.5rem; }
+.bookmarks-archive-unavailable { color: #a6bca9; font-style: italic; }
+.bookmarks-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 1rem; }
+.bookmarks-item { border-left: 1px solid #386555; padding: 0 0 0 1.25rem; min-width: 0; }
+.bookmarks-link { display: block; color: #edf2ec; font: 1.2rem Georgia, serif; text-decoration: none; overflow-wrap: anywhere; }
+.bookmarks-link:hover { text-decoration: underline; }
+.bookmarks-id { color: #a6bca9; font-size: .75rem; overflow-wrap: anywhere; }
+.bookmarks-missing { margin: 0 0 .35rem; color: #a6bca9; font-style: italic; }
+
 @media (max-width: 640px) {
   .chronicle-shell::before {
     height: 54rem;
