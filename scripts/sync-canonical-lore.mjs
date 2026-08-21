@@ -8,7 +8,7 @@
 //     │  import exact Git-object bytes <EXACT_SHA>:lore/data.json
 //     │  validate → mechanically compute digest + provenance
 //     ▼
-//   derived Reader generation (transactionally published)
+//   derived Reader generation (validated before sequential publication)
 //
 // The operator supplies ONLY the local canonical repository path. The sync
 // command owns generation resolution: it resolves canonical `main` to one exact
@@ -73,14 +73,26 @@ async function readPriorProvenance(outputDirectory) {
   }
 }
 
-/** Publish a complete validated in-memory generation transactionally. Writes the
- *  complete candidate to a temporary directory on the SAME filesystem as the
- *  output, re-validates the candidate from disk, then atomically renames each
- *  file over the live output. On any failure before publish, the output
- *  directory is untouched and the candidate is removed (Stage 2A-P2R2 §16). */
-async function publishGeneration(artifacts, outputDirectory) {
+class PublishPhaseFailure extends Error {
+  constructor(cause, publishedArtifactCount) {
+    const detail = cause instanceof Error ? cause.message : String(cause);
+    super(`PUBLISH_PHASE_FAILED_AFTER_${publishedArtifactCount}_REPLACEMENTS: ${detail}`);
+    this.name = 'PublishPhaseFailure';
+    this.publishedArtifactCount = publishedArtifactCount;
+  }
+}
+
+/** Write and validate a complete candidate before sequential per-file
+ *  publication. Each rename is atomic, but the four renames are not one atomic
+ *  generation transaction. A failure before publication begins preserves the
+ *  prior live generation. Once the first rename is attempted, failure leaves
+ *  live publication state unknown and no preservation claim is made. */
+async function publishGeneration(artifacts, outputDirectory, renameFile) {
   await mkdir(outputDirectory, { recursive: true });
   const candidate = await mkdtemp(resolve(outputDirectory, '.sync-candidate-'));
+  let publicationStarted = false;
+  let publishedArtifactCount = 0;
+  let failure;
   try {
     await writeGenerationArtifacts(artifacts, candidate);
 
@@ -92,27 +104,49 @@ async function publishGeneration(artifacts, outputDirectory) {
     loadGeneratedArchive(candidate);
     loadMediaReaderState(candidate);
 
-    // Publish: atomic per-file rename over the live files (same filesystem).
+    // Publish sequentially. Each same-filesystem rename is atomic for its one
+    // file; the complete set is not a whole-generation atomic transaction.
+    publicationStarted = true;
     for (const file of GENERATION_FILES) {
-      await rename(resolve(candidate, file), resolve(outputDirectory, file));
+      await renameFile(resolve(candidate, file), resolve(outputDirectory, file));
+      publishedArtifactCount += 1;
     }
-  } finally {
-    // Remove the candidate directory and any leftover files (it is empty on a
-    // clean publish; this also cleans up after a pre-publish failure).
-    await rm(candidate, { recursive: true, force: true });
+  } catch (error) {
+    failure = publicationStarted
+      ? new PublishPhaseFailure(error, publishedArtifactCount)
+      : error;
   }
+
+  try {
+    // Remove the candidate directory and any leftover files (it is empty on a
+    // clean publish; this also cleans up after failure).
+    await rm(candidate, { recursive: true, force: true });
+  } catch (error) {
+    if (failure === undefined) {
+      failure = publicationStarted
+        ? new PublishPhaseFailure(error, publishedArtifactCount)
+        : error;
+    }
+  }
+
+  if (failure !== undefined) throw failure;
 }
 
 /**
  * Run a canonical-main sync. Returns a structured result and never throws for
  * classified sync refusals (invalid source, duplicate IDs, fetch failure, wrong
  * remote, etc.) — those become `{ ok: false, reason, ... }` so the operator and
- * tests can assert them. A refused sync NEVER mutates the output directory;
- * `preserved` is always true on refusal.
+ * tests can assert them. Refusal before publication begins reports the prior
+ * generation preserved. Failure after sequential publication begins reports
+ * publication state unknown and never claims preservation.
  *
  * @param {{ canonicalRepo: string, output?: string, generatedAt?: string }} opts
+ * @param {{ renameFile?: typeof rename }} dependencies test-only I/O seam
  */
-export async function syncCanonicalLore({ canonicalRepo, output = 'generated', generatedAt }) {
+export async function syncCanonicalLore(
+  { canonicalRepo, output = 'generated', generatedAt },
+  { renameFile = rename } = {},
+) {
   const outputDirectory = resolve(output);
   const previousGeneration = await readPriorProvenance(outputDirectory);
   let resolvedCommit;
@@ -130,9 +164,8 @@ export async function syncCanonicalLore({ canonicalRepo, output = 'generated', g
       commit,
     }, generatedAt);
 
-    // Transactional publish: complete candidate → validate → atomic replace.
-    // A failure here leaves the live output untouched.
-    await publishGeneration(artifacts, outputDirectory);
+    // Complete candidate validation precedes sequential per-file publication.
+    await publishGeneration(artifacts, outputDirectory, renameFile);
 
     return {
       ok: true,
@@ -141,12 +174,15 @@ export async function syncCanonicalLore({ canonicalRepo, output = 'generated', g
       previousGeneration,
     };
   } catch (error) {
+    const publishFailure = error instanceof PublishPhaseFailure;
     return {
       ok: false,
       resolvedCommit,
       reason: error.message,
       previousGeneration,
-      preserved: true,
+      publicationState: publishFailure ? 'failed_unknown' : 'not_started',
+      publishedArtifactCount: publishFailure ? error.publishedArtifactCount : 0,
+      preserved: !publishFailure,
     };
   }
 }
@@ -173,7 +209,8 @@ async function main() {
   console.log('CANONICAL_SYNC_REFUSED');
   if (result.resolvedCommit) console.log(`resolved_commit: ${result.resolvedCommit}`);
   console.log(`reason: ${result.reason}`);
-  console.log(`previous_generation_preserved: YES`);
+  console.log(`publication_state: ${result.publicationState}`);
+  console.log(`previous_generation_preserved: ${result.preserved ? 'YES' : 'NO_OR_UNKNOWN'}`);
   process.exitCode = 1;
 }
 

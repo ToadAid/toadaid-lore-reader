@@ -134,23 +134,44 @@ export function readCanonicalBytes(canonicalRepo: string, commit: string): Canon
 // from another.
 
 /**
- * Normalize a Git remote URL to its `owner/name` slug, stripping scheme, user,
- * host, and a trailing `.git`. Used to verify a canonical-repo clone actually
- * points at the permanent canonical repository. Reads the RAW configured URL
- * (git applies `insteadOf` only during fetch/ls-remote, not here), so this is
- * the literal configured origin, not a rewrite.
+ * Normalize one governed GitHub remote form to `host/owner/name`, retaining the
+ * host as part of repository identity. Unsupported schemes, userinfo, ports,
+ * path shapes, and SCP users return an empty value and therefore fail closed.
+ * Reads the RAW configured URL (git applies `insteadOf` only during
+ * fetch/ls-remote, not here), so this is the literal configured origin, not a
+ * rewrite.
  */
 export function normalizeRemoteUrl(url: string): string {
-  let u = url.trim();
-  if (u.endsWith('.git')) u = u.slice(0, -4);
-  // Strip an optional scheme and an optional `user@` userinfo prefix.
-  u = u.replace(/^[A-Za-z][A-Za-z0-9+.-]*:\/\//, '');
-  u = u.replace(/^[^/@]*@/, '');
-  // scp-like form `host:owner/name` -> `host/owner/name` (first colon only).
-  const colon = u.indexOf(':');
-  if (colon !== -1 && !u.slice(0, colon).includes('/')) u = u.slice(0, colon) + '/' + u.slice(colon + 1);
-  const segments = u.split('/').filter((segment) => segment.length > 0);
-  return segments.slice(-2).join('/');
+  const value = url.trim();
+  let host: string;
+  let path: string;
+
+  if (/^[A-Za-z][A-Za-z0-9+.-]*:\/\//.test(value)) {
+    let parsed: URL;
+    try {
+      parsed = new URL(value);
+    } catch {
+      return '';
+    }
+    const https = parsed.protocol === 'https:' && parsed.username === '';
+    const ssh = parsed.protocol === 'ssh:' && parsed.username === 'git';
+    if ((!https && !ssh) || parsed.password !== '' || parsed.port !== '' || parsed.search !== '' || parsed.hash !== '') {
+      return '';
+    }
+    host = parsed.hostname.toLowerCase();
+    path = parsed.pathname;
+  } else {
+    const scp = /^git@([^/:]+):(.+)$/.exec(value);
+    if (!scp) return '';
+    host = scp[1].toLowerCase();
+    path = scp[2];
+  }
+
+  const repositoryPath = path.startsWith('/') ? path.slice(1) : path;
+  const withoutGitSuffix = repositoryPath.endsWith('.git') ? repositoryPath.slice(0, -4) : repositoryPath;
+  const segments = withoutGitSuffix.split('/');
+  if (segments.length !== 2 || segments.some((segment) => segment === '' || segment === '.' || segment === '..')) return '';
+  return `${host}/${segments.join('/')}`;
 }
 
 /**
@@ -171,9 +192,10 @@ export function assertCanonicalRemote(canonicalRepo: string): void {
     fail('CANONICAL_REMOTE_ORIGIN_MISSING: origin remote is not configured');
   }
   if (url.length === 0) fail('CANONICAL_REMOTE_ORIGIN_MISSING: origin remote URL is empty');
-  const slug = normalizeRemoteUrl(url);
-  if (slug !== CANONICAL_REPOSITORY) {
-    fail(`CANONICAL_REMOTE_NOT_CANONICAL: origin ${slug} is not ${CANONICAL_REPOSITORY}`);
+  const identity = normalizeRemoteUrl(url);
+  const canonicalIdentity = `github.com/${CANONICAL_REPOSITORY}`;
+  if (identity !== canonicalIdentity) {
+    fail(`CANONICAL_REMOTE_NOT_CANONICAL: origin ${identity || 'unrecognized'} is not ${canonicalIdentity}`);
   }
 }
 

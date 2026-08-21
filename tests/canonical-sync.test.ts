@@ -3,7 +3,7 @@ import test from 'node:test';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, readFileSync } from 'node:fs';
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, writeFile, rm, rename } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import {
@@ -366,6 +366,43 @@ test('17. a failed candidate generation leaves the prior valid generation unchan
   assert.equal(state.sourceDigest, beforeDigest);
 });
 
+test('17a. failure after one live replacement reports publication unknown and not preserved', async () => {
+  const c = makeCanonicalClone();
+  commitLore(c, fixtureA, 'add lore A');
+  const out = tmpDir('p2r2-out-');
+  const a = await syncInto(c, out);
+  assert.equal(a.ok, true);
+
+  const before = new Map(
+    ['reader-snapshot.json', 'LORE_SOURCE.json', 'legacy-media-candidates.json', 'media-interpretation.json']
+      .map((file) => [file, readFileSync(join(out, file))]),
+  );
+  commitLore(c, fixtureB, 'change lore B');
+  let renameCalls = 0;
+  const failed = await syncCanonicalLore(
+    { canonicalRepo: c.clone, output: out, generatedAt: GENERATED_AT },
+    {
+      renameFile: async (source: string, destination: string) => {
+        renameCalls += 1;
+        if (renameCalls === 2) throw new Error('injected publish failure');
+        await rename(source, destination);
+      },
+    },
+  );
+
+  assert.equal(renameCalls, 2);
+  assert.equal(failed.ok, false);
+  assert.equal(failed.publicationState, 'failed_unknown');
+  assert.equal(failed.publishedArtifactCount, 1);
+  assert.equal(failed.preserved, false);
+  assert.match(failed.reason, /PUBLISH_PHASE_FAILED_AFTER_1_REPLACEMENTS/);
+  assert.notDeepEqual(readFileSync(join(out, 'reader-snapshot.json')), before.get('reader-snapshot.json'));
+  for (const file of ['LORE_SOURCE.json', 'legacy-media-candidates.json', 'media-interpretation.json']) {
+    assert.deepEqual(readFileSync(join(out, file)), before.get(file));
+  }
+  assert.throws(() => loadGeneratedArchive(out), /snapshot provenance does not match LORE_SOURCE/);
+});
+
 test('18. mixed-generation derived manifests fail closed', async () => {
   // Build two complete valid generations in memory, then write generation A's
   // snapshot + LORE_SOURCE but generation B's media-interpretation manifest into
@@ -483,20 +520,31 @@ test('24. no second canonical-data copy is authored (generated/ is disposable, g
 // Canonical-remote identity verification (used by sync, hermetic).
 // ---------------------------------------------------------------------------
 
-test('normalizeRemoteUrl extracts the owner/name slug from common remote forms', () => {
-  assert.equal(normalizeRemoteUrl('https://github.com/ToadAid/toadaid.github.io'), 'ToadAid/toadaid.github.io');
-  assert.equal(normalizeRemoteUrl('https://github.com/ToadAid/toadaid.github.io.git'), 'ToadAid/toadaid.github.io');
-  assert.equal(normalizeRemoteUrl('git@github.com:ToadAid/toadaid.github.io.git'), 'ToadAid/toadaid.github.io');
-  assert.equal(normalizeRemoteUrl('ssh://git@github.com/ToadAid/toadaid.github.io.git'), 'ToadAid/toadaid.github.io');
+test('normalizeRemoteUrl retains the canonical GitHub host for governed HTTPS and SSH forms', () => {
+  const identity = 'github.com/ToadAid/toadaid.github.io';
+  assert.equal(normalizeRemoteUrl('https://github.com/ToadAid/toadaid.github.io'), identity);
+  assert.equal(normalizeRemoteUrl('https://github.com/ToadAid/toadaid.github.io.git'), identity);
+  assert.equal(normalizeRemoteUrl('git@github.com:ToadAid/toadaid.github.io.git'), identity);
+  assert.equal(normalizeRemoteUrl('ssh://git@github.com/ToadAid/toadaid.github.io.git'), identity);
 });
 
-test('assertCanonicalRemote accepts the canonical clone and rejects a foreign remote', () => {
+test('assertCanonicalRemote accepts only canonical GitHub forms and rejects foreign identity or host', () => {
   const c = makeCanonicalClone();
-  // The clone's origin is configured to the canonical GitHub URL.
-  assert.doesNotThrow(() => assertCanonicalRemote(c.clone));
+  for (const canonical of [
+    'https://github.com/ToadAid/toadaid.github.io',
+    'https://github.com/ToadAid/toadaid.github.io.git',
+    'git@github.com:ToadAid/toadaid.github.io.git',
+    'ssh://git@github.com/ToadAid/toadaid.github.io.git',
+  ]) {
+    git(c.clone, ['remote', 'set-url', 'origin', canonical]);
+    assert.doesNotThrow(() => assertCanonicalRemote(c.clone));
+  }
 
   const foreign = makeCanonicalClone();
   git(foreign.clone, ['remote', 'set-url', 'origin', 'https://github.com/other/repo.git']);
+  assert.throws(() => assertCanonicalRemote(foreign.clone), /CANONICAL_REMOTE_NOT_CANONICAL/);
+
+  git(foreign.clone, ['remote', 'set-url', 'origin', 'https://evil.example/ToadAid/toadaid.github.io.git']);
   assert.throws(() => assertCanonicalRemote(foreign.clone), /CANONICAL_REMOTE_NOT_CANONICAL/);
 });
 
@@ -511,6 +559,19 @@ test('sync against a non-canonical remote is refused', async () => {
   const result = await syncInto(c, out);
   assert.equal(result.ok, false);
   assert.match(result.reason, /CANONICAL_REMOTE_NOT_CANONICAL/);
+  assert.equal(existsSync(join(out, 'reader-snapshot.json')), false);
+});
+
+test('sync refuses a foreign host carrying the exact canonical owner/repository path', async () => {
+  const c = makeCanonicalClone();
+  commitLore(c, fixtureA, 'add lore A');
+  git(c.clone, ['remote', 'set-url', 'origin', 'https://evil.example/ToadAid/toadaid.github.io.git']);
+  const out = tmpDir('p2r2-out-');
+  const result = await syncInto(c, out);
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /CANONICAL_REMOTE_NOT_CANONICAL/);
+  assert.equal(result.publicationState, 'not_started');
+  assert.equal(result.preserved, true);
   assert.equal(existsSync(join(out, 'reader-snapshot.json')), false);
 });
 
