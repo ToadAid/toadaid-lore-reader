@@ -88,10 +88,12 @@ jobs:
         env:
           PUBLIC_SITE: https://toadaid.github.io
           PUBLIC_BASE: /toadaid-lore-reader/
+          PUBLIC_PWA: 1
+          PUBLIC_READER_SHA: ${{ steps.deployment-generation.outputs.reader_sha }}
         run: npm run build
       - name: Validate Pages artifact
         if: steps.deployment-gate.outputs.deploy_required == 'true'
-        run: node scripts/validate-public-build.mjs --dir dist --base /toadaid-lore-reader/
+        run: node scripts/validate-public-build.mjs --dir dist --base /toadaid-lore-reader/ --pwa 1
       - name: Configure GitHub Pages
         if: steps.deployment-gate.outputs.deploy_required == 'true'
         uses: actions/configure-pages@v6

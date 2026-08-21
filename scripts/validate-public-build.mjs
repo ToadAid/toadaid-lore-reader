@@ -80,6 +80,33 @@ export function validatePublicBuild(directory, requestedBase) {
   return { base, documents: documents.length, internalReferences };
 }
 
+export function validatePwa(directory, requestedBase) {
+  const base = normalizePublicBase(requestedBase);
+  const manifestPath = resolve(directory, 'manifest.webmanifest');
+  const workerPath = resolve(directory, 'sw.js');
+  if (!existsSync(manifestPath)) fail('public PWA manifest missing');
+  if (!existsSync(workerPath)) fail('public PWA service worker missing');
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  for (const [name, value] of [['start_url', manifest.start_url], ['scope', manifest.scope]]) {
+    if (typeof value !== 'string' || !value.startsWith(base)) fail(`manifest ${name} escapes public base`);
+  }
+  if (!Array.isArray(manifest.icons) || manifest.icons.length < 2) fail('manifest lacks practical icon coverage');
+  for (const icon of manifest.icons) {
+    if (!icon || typeof icon.src !== 'string' || !icon.src.startsWith(base)) fail('manifest icon escapes public base');
+    if (!existsSync(outputPath(directory, icon.src.slice(base.length)))) fail(`manifest icon missing: ${icon.src}`);
+  }
+  const worker = readFileSync(workerPath, 'utf8');
+  if (/toadaid\.github\.io\/lore\/data\.json|raw\.githubusercontent\.com[^"']*\/lore\/data\.json/i.test(worker)) fail('service worker contains canonical runtime fetch target');
+  if (/https?:\/\//i.test(worker.replace(/https?:\/\/[^\n]*/g, ''))) fail('service worker contains unexpected external URL');
+  const precache = worker.match(/const PRECACHE = (\[[\s\S]*?\]);/);
+  if (!precache) fail('service worker precache list missing');
+  for (const resource of JSON.parse(precache[1])) {
+    if (typeof resource !== 'string' || !resource.startsWith(base) || /^(?:https?:)?\/\//i.test(resource)) fail(`precache resource escapes public base: ${resource}`);
+  }
+  const index = readFileSync(resolve(directory, 'index.html'), 'utf8');
+  if (!index.includes(`manifest.webmanifest`) || !index.includes(`register(serviceWorkerUrl`)) fail('public PWA registration missing from cover');
+}
+
 function argsFrom(argv) {
   const args = {};
   for (let index = 0; index < argv.length; index += 2) {
@@ -96,6 +123,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   try {
     const args = argsFrom(process.argv.slice(2));
     const result = validatePublicBuild(args.dir, args.base);
+    if (args.pwa === '1') validatePwa(args.dir, args.base);
     console.log(`PUBLIC_BUILD_VALID base=${result.base} documents=${result.documents} internal_references=${result.internalReferences}`);
   } catch (error) {
     console.error(error.message);

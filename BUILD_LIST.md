@@ -33,7 +33,7 @@
 
 ## P3 — PWA / Offline
 
-- [ ] Not started.
+- [x] Verified Offline PWA Archive (Stage 2A-PWA1): public builds explicitly admitted with `PUBLIC_PWA=1` emit a base-aware manifest and bounded service worker. The service worker precaches only the complete same-origin generated Reader, keyed by exact Reader SHA + canonical SHA; it never fetches canonical source or third-party media. Existing Pond Archive artwork supplies documented deterministic 192px and 512px installation icon derivatives. Default/local and desktop builds do not register PWA behavior.
 
 ## P4 — Interactive Study
 

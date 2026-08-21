@@ -7,7 +7,8 @@ import { tmpdir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
 import { normalizePublicBase, publicPath } from '../src/lib/public-site.ts';
 import { recordRoute } from '../src/lib/lore/reader-model.ts';
-import { validatePublicBuild } from '../scripts/validate-public-build.mjs';
+import { validatePublicBuild, validatePwa } from '../scripts/validate-public-build.mjs';
+import { offlineGenerationKey, precachePaths } from '../scripts/build-reader.mjs';
 
 const REPO = resolve('.');
 const WORKFLOW = readFileSync(resolve(REPO, '.github/workflows/public-pages.yml'), 'utf8');
@@ -147,6 +148,12 @@ function build(project: string, mode: 'local' | 'pages') {
   return join(project, 'dist');
 }
 
+function pwaBuild(project: string, base: string) {
+  const env = { ...process.env, PUBLIC_PWA: '1', PUBLIC_BASE: base, PUBLIC_SITE: PAGES_SITE, PUBLIC_READER_SHA: 'a'.repeat(40) };
+  run(project, 'npm', ['run', 'build'], env);
+  return join(project, 'dist');
+}
+
 test('public base abstraction preserves local root and prefixes the Pages project site once', () => {
   assert.equal(normalizePublicBase(undefined), '/');
   assert.equal(normalizePublicBase('/'), '/');
@@ -155,6 +162,24 @@ test('public base abstraction preserves local root and prefixes the Pages projec
   assert.equal(publicPath('/bookmarks/', PAGES_BASE), `${PAGES_BASE}bookmarks/`);
   assert.equal(recordRoute('TOBY A', '/'), '/record/TOBY%20A/');
   assert.equal(recordRoute('TOBY A', PAGES_BASE), `${PAGES_BASE}record/TOBY%20A/`);
+});
+
+test('offline cache identity requires both exact generation SHAs without time or randomness', () => {
+  const reader = 'a'.repeat(40);
+  const lore = 'b'.repeat(40);
+  assert.equal(offlineGenerationKey(reader, lore), offlineGenerationKey(reader, lore));
+  assert.notEqual(offlineGenerationKey('c'.repeat(40), lore), offlineGenerationKey(reader, lore));
+  assert.notEqual(offlineGenerationKey(reader, 'c'.repeat(40)), offlineGenerationKey(reader, lore));
+  assert.doesNotMatch(offlineGenerationKey(reader, lore), /date|time|random|uuid/i);
+});
+
+test('cover is timeless while verified record count remains derived archive state', () => {
+  const cover = readFileSync(resolve(REPO, 'src/pages/index.astro'), 'utf8');
+  const state = readFileSync(resolve(REPO, 'src/lib/lore/archive-cover-state.ts'), 'utf8');
+  assert.match(cover, />Verified canonical archive</);
+  assert.doesNotMatch(cover, /records preserved/);
+  assert.match(cover, /canonicalCommit\.slice\(0, 9\)/);
+  assert.match(state, /recordCount/);
 });
 
 test('public workflow has the three governed automatic triggers and no PR deployment trigger', () => {
@@ -324,6 +349,8 @@ test('valid canonical A then B drives local and Pages builds through the same co
 
   const localDist = build(project, 'local');
   assert.equal(validatePublicBuild(localDist, '/').base, '/');
+  assert.equal(existsSync(join(localDist, 'manifest.webmanifest')), false, 'ordinary local build has no PWA artifact');
+  assert.doesNotMatch(readFileSync(join(localDist, 'index.html'), 'utf8'), /serviceWorker\.register/);
   const localRecord = readFileSync(join(localDist, 'record/PUB_A/index.html'), 'utf8');
   assert.match(localRecord, /data-share-url="\/record\/PUB_A\/"/);
   assert.match(localRecord, /href="\/chronicle\/"/);
@@ -358,6 +385,34 @@ test('valid canonical A then B drives local and Pages builds through the same co
   assert.match(first, /https:\/\/cdn\.example\.test\/b\.jpg/);
   assert.match(second, /data-yt-embed="https:\/\/www\.youtube-nocookie\.com\/embed\/dQw4w9WgXcQ"/);
   assert.match(second, /href="https:\/\/youtu\.be\/dQw4w9WgXcQ"/);
+});
+
+test('admitted PWA builds are base-bounded and precache the complete static Reader only', { timeout: 30_000 }, () => {
+  const project = copyReaderFixture();
+  const canonical = canonicalFixture();
+  const commit = commitLore(canonical, [
+    { id: 'PWA_A', date: '2026-01-01', title: 'PWA A', comment: 'A', img: 'https://cdn.example.test/a.jpg' },
+    { id: 'PWA_B', date: '2026-01-02', title: 'PWA B', comment: 'B', img: 'https://youtu.be/dQw4w9WgXcQ' },
+  ], 'pwa generation');
+  assert.match(sync(project, canonical.clone), /CANONICAL_SYNC_OK/);
+  for (const base of ['/', PAGES_BASE]) {
+    const dist = pwaBuild(project, base);
+    validatePublicBuild(dist, base);
+    validatePwa(dist, base);
+    const manifest = JSON.parse(readFileSync(join(dist, 'manifest.webmanifest'), 'utf8'));
+    assert.equal(manifest.start_url, base);
+    assert.equal(manifest.scope, base);
+    assert.ok(manifest.icons.every((icon: { src: string }) => icon.src.startsWith(base)));
+    const sw = readFileSync(join(dist, 'sw.js'), 'utf8');
+    assert.match(sw, new RegExp(`lore-${commit}`));
+    assert.match(sw, /request\.method !== 'GET'/);
+    assert.match(sw, /url\.origin !== self\.location\.origin/);
+    assert.match(sw, /name\.startsWith\(OWNED_PREFIX\)/);
+    assert.doesNotMatch(sw, /toadaid\.github\.io\/lore\/data\.json|raw\.githubusercontent\.com/i);
+    assert.doesNotMatch(sw, /cdn\.example\.test|youtube-nocookie|youtu\.be/);
+    for (const route of [base, `${base}chronicle/`, `${base}bookmarks/`, `${base}record/PWA_A/`, `${base}record/PWA_B/`]) assert.match(sw, new RegExp(route.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    assert.deepEqual(precachePaths(dist, base).filter((path) => /^https?:/.test(path)), []);
+  }
 });
 
 test('built-output validator rejects an internal root link that escapes the Pages base', () => {
