@@ -22,6 +22,7 @@ import { startReaderHost } from './static-reader-host.mjs';
 import { createSettingsStore } from './settings-store.mjs';
 import { createDesktopLoreSyncService } from './lore-sync-service.mjs';
 import { classifyNavigation } from './navigation-policy.mjs';
+import { establishSingleInstance } from './single-instance.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..');
@@ -117,7 +118,7 @@ function registerIpc(settingsStore, service) {
     const selected = result.filePaths[0];
     settingsStore.setCanonicalRepoPath(selected);
     pushStatus(service);
-    return selected;
+    return true;
   });
 
   ipcMain.handle('desktop:sync-lore', async () => {
@@ -127,18 +128,24 @@ function registerIpc(settingsStore, service) {
   });
 }
 
-// Single-instance; quit when all windows closed (non-mac). No auto-sync on start (§41).
-app.whenReady().then(bootstrap).catch((err) => {
-  console.error('ToadAid desktop shell failed to start:', err && err.message ? err.message : err);
-  process.exitCode = 1;
-});
+// Establish native Electron desktop authority before any host/service/window is
+// created. A second process exits and focuses/restores this first window.
+const ownsDesktopAuthority = establishSingleInstance({ app, getWindow: () => mainWindow });
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
-});
+if (ownsDesktopAuthority) {
+  // No auto-sync on start (§41).
+  app.whenReady().then(bootstrap).catch((err) => {
+    console.error('ToadAid desktop shell failed to start:', err && err.message ? err.message : err);
+    process.exitCode = 1;
+  });
 
-app.on('activate', async () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    if (mainWindow === null) await bootstrap();
-  }
-});
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') app.quit();
+  });
+
+  app.on('activate', async () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      if (mainWindow === null) await bootstrap();
+    }
+  });
+}

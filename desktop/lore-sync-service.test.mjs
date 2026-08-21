@@ -129,7 +129,17 @@ test('#13 getStatus derives generation + record count from generated provenance'
     assert.equal(status.generation, '464933c');
     assert.equal(status.lastSyncedAt, '2026-08-19T00:00:00.000Z', 'startup seeds last synced from existing generation (§41)');
     assert.equal(status.inProgress, false);
+    assert.equal(status.sourceConfigured, true);
+    assert.equal(status.sourceName, 'toadaid.github.io');
+    assert.ok(!Object.values(status).includes('/home/tommy/toadaid.github.io'), 'status must not expose the full configured path');
   } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test('status reports an unconfigured source without a path or name', () => {
+  const { service } = makeService({ path: '' });
+  const status = service.getStatus();
+  assert.equal(status.sourceConfigured, false);
+  assert.equal(status.sourceName, null);
 });
 
 test('success sets lastSyncedAt and a subsequent status reflects it', async () => {

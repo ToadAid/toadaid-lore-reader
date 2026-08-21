@@ -21,6 +21,7 @@ const {
   DESKTOP_METHODS,
   FORBIDDEN_EXPOSED,
   buildDesktopOverlayHTML,
+  createDesktopOverlayController,
   renderStatusMessage,
 } = require('./desktop-overlay.cjs');
 
@@ -63,81 +64,112 @@ contextBridge.exposeInMainWorld('toadaidDesktop', bridge);
 
 const PANEL_STYLE = [
   'position:fixed', 'top:12px', 'right:12px', 'z-index:2147483647',
-  'background:rgba(13,18,16,0.92)', 'color:#e8f0ec', 'border:1px solid #2a3a32',
-  'border-radius:8px', 'padding:10px 12px', 'font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace',
-  'max-width:240px', 'box-shadow:0 4px 18px rgba(0,0,0,0.45)',
-  'backdrop-filter:blur(4px)', 'user-select:none',
+  'color:#e8f0ec', 'font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace',
+  'max-width:min(272px,calc(100vw - 24px))', 'user-select:none',
 ].join(';');
 const BUTTON_STYLE = [
-  'width:100%', 'margin-top:6px', 'padding:6px 10px',
+  'width:100%', 'margin-top:7px', 'padding:6px 10px',
   'background:#1f6f4a', 'color:#fff', 'border:1px solid #2a3a32',
   'border-radius:6px', 'cursor:pointer', 'font:inherit',
 ].join(';');
+const COLLAPSED_STYLE = [
+  'width:auto', 'margin:0', 'padding:7px 11px', 'background:rgba(13,18,16,0.9)',
+  'color:#e8f0ec', 'border:1px solid #52655a', 'border-radius:999px',
+  'box-shadow:0 3px 14px rgba(0,0,0,0.38)', 'backdrop-filter:blur(4px)',
+  'cursor:pointer', 'font:inherit',
+].join(';');
+const DETAILS_STYLE = [
+  'box-sizing:border-box', 'width:260px', 'max-width:100%', 'padding:10px 12px',
+  'background:rgba(13,18,16,0.94)', 'border:1px solid #2a3a32', 'border-radius:8px',
+  'box-shadow:0 4px 18px rgba(0,0,0,0.45)', 'backdrop-filter:blur(4px)',
+].join(';');
+const HEADER_STYLE = ['display:flex', 'align-items:center', 'justify-content:space-between', 'gap:12px'].join(';');
+const COLLAPSE_STYLE = [
+  'margin:0', 'padding:1px 6px', 'background:transparent', 'color:#d8e4dc',
+  'border:1px solid #52655a', 'border-radius:5px', 'cursor:pointer', 'font:inherit',
+].join(';');
+const LINE_STYLE = ['margin:7px 0 0', 'overflow-wrap:anywhere'].join(';');
+const MESSAGE_STYLE = ['margin:7px 0 0', 'max-width:100%', 'white-space:normal', 'overflow-wrap:anywhere', 'color:#f2d9a7'].join(';');
 
-function escapeHtml(value) {
-  return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
-function formatLocal(iso) {
-  try { const d = new Date(iso); return Number.isNaN(d.getTime()) ? iso : d.toLocaleString(); } catch { return iso; }
+const panelState = { expanded: false, syncing: false, message: '' };
+let currentStatus = { available: false, lastSyncedAt: null, inProgress: false };
+let controller;
+
+function applyStyles(node) {
+  node.style.cssText = PANEL_STYLE;
+  const collapsed = node.querySelector('[data-toadaid-action="expand"]');
+  if (collapsed) collapsed.style.cssText = COLLAPSED_STYLE;
+  const details = node.querySelector('[data-toadaid-details]');
+  if (details) details.style.cssText = DETAILS_STYLE;
+  const header = node.querySelector('.toadaid-desk-header');
+  if (header) header.style.cssText = HEADER_STYLE;
+  const collapse = node.querySelector('[data-toadaid-action="collapse"]');
+  if (collapse) collapse.style.cssText = COLLAPSE_STYLE;
+  for (const line of node.querySelectorAll('.toadaid-desk-line')) line.style.cssText = LINE_STYLE;
+  const message = node.querySelector('[data-toadaid-message]');
+  if (message) message.style.cssText = MESSAGE_STYLE;
+  for (const action of node.querySelectorAll('[data-toadaid-action="choose-repo"], [data-toadaid-action="sync-lore"]')) {
+    action.style.cssText = BUTTON_STYLE;
+  }
 }
 
-function mountPanel(status) {
+function createPanel(status) {
   const wrapper = document.createElement('div');
-  wrapper.innerHTML = buildDesktopOverlayHTML(status);
+  wrapper.innerHTML = buildDesktopOverlayHTML(status, panelState);
   const node = wrapper.firstElementChild;
   if (!node) return null;
-  node.style.cssText = PANEL_STYLE;
-  const button = node.querySelector('[data-toadaid-action="sync-lore"]');
-  if (button) button.style.cssText = BUTTON_STYLE;
-  wireButton(node);
-  document.body.appendChild(node);
+  applyStyles(node);
+  wirePanel(node);
   return node;
 }
 
-function wireButton(node) {
-  const button = node.querySelector('[data-toadaid-action="sync-lore"]');
-  const message = node.querySelector('[data-toadaid-message]');
-  if (!button) return;
-  button.addEventListener('click', async () => {
-    button.disabled = true;
-    button.setAttribute('aria-busy', 'true');
-    button.textContent = 'Syncing…';
-    if (message) message.textContent = '';
+function renderOverlay() {
+  const next = createPanel(currentStatus);
+  if (!next) return;
+  const prior = document.querySelector('[data-toadaid-desktop="1"]');
+  if (prior) prior.replaceWith(next);
+  else document.body.appendChild(next);
+}
+
+function wirePanel(node) {
+  node.querySelector('[data-toadaid-action="expand"]')?.addEventListener('click', () => {
+    panelState.expanded = true;
+    renderOverlay();
+  });
+  node.querySelector('[data-toadaid-action="collapse"]')?.addEventListener('click', () => {
+    panelState.expanded = false;
+    renderOverlay();
+  });
+
+  node.querySelector('[data-toadaid-action="choose-repo"]')?.addEventListener('click', async () => {
     try {
-      const result = await window.toadaidDesktop.syncLore();
-      if (message) message.textContent = renderStatusMessage(result);
-      await refreshStatus();
+      panelState.message = '';
+      await controller.chooseCanonicalRepo();
     } catch (err) {
-      if (message) message.textContent = `Sync error: ${err && err.message ? err.message : String(err)}`;
+      panelState.message = `Folder selection error: ${err && err.message ? err.message : String(err)}`;
+      renderOverlay();
+    }
+  });
+
+  node.querySelector('[data-toadaid-action="sync-lore"]')?.addEventListener('click', async () => {
+    if (panelState.syncing) return;
+    panelState.syncing = true;
+    panelState.message = '';
+    renderOverlay();
+    try {
+      panelState.message = renderStatusMessage(await controller.syncLore());
+    } catch (err) {
+      panelState.message = `Sync error: ${err && err.message ? err.message : String(err)}`;
     } finally {
-      button.disabled = false;
-      button.removeAttribute('aria-busy');
-      button.textContent = 'Sync Lore';
+      panelState.syncing = false;
+      try { await controller.refreshStatus(); } catch { renderOverlay(); }
     }
   });
 }
 
-// Rebuild the read-only lines from status, preserving the message text and the
-// button's in-flight state across a status push (e.g. after sync→build→reload).
 function updateOverlay(status) {
-  const node = document.querySelector('[data-toadaid-desktop="1"]');
-  if (!node) { mountPanel(status); return; }
-  const prevMessage = node.querySelector('[data-toadaid-message]')?.textContent || '';
-  const prevButton = node.querySelector('[data-toadaid-action="sync-lore"]');
-  const prevDisabled = prevButton ? prevButton.disabled : false;
-  const prevText = prevButton ? prevButton.textContent : 'Sync Lore';
-  node.innerHTML = buildDesktopOverlayHTML(status);
-  if (prevDisabled) {
-    const b = node.querySelector('[data-toadaid-action="sync-lore"]');
-    if (b) { b.disabled = true; b.setAttribute('aria-busy', 'true'); b.textContent = prevText; }
-  }
-  const m = node.querySelector('[data-toadaid-message]');
-  if (m) m.textContent = prevMessage;
-  wireButton(node);
-}
-
-async function refreshStatus() {
-  try { updateOverlay(await window.toadaidDesktop.getStatus()); } catch { /* best-effort */ }
+  currentStatus = status || currentStatus;
+  renderOverlay();
 }
 
 function ready(fn) {
@@ -149,8 +181,7 @@ function ready(fn) {
 }
 
 ready(async () => {
-  let initialStatus = { available: false, lastSyncedAt: null, inProgress: false };
-  try { initialStatus = await window.toadaidDesktop.getStatus(); } catch { /* offline */ }
-  mountPanel(initialStatus);
-  window.toadaidDesktop.onStatusUpdate((status) => updateOverlay(status));
+  controller = createDesktopOverlayController(bridge, updateOverlay);
+  try { await controller.refreshStatus(); } catch { renderOverlay(); }
+  controller.subscribe();
 });

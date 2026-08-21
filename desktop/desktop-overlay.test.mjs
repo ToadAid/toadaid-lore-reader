@@ -39,12 +39,33 @@ test('#2 the desktop overlay exposes a visible Sync Lore control', () => {
   assert.match(html, /Generation:/);
   assert.match(html, /464933c/);
   assert.match(html, /Records:/);
+  assert.match(html, /data-expanded="false"/);
+  assert.match(html, /data-toadaid-details hidden/, 'details are collapsed by default');
+  assert.match(html, /aria-expanded="false"/);
 });
 
 test('#2 overlay shows Never/unavailable when no generation exists', () => {
   const html = overlay.buildDesktopOverlayHTML({ available: false, lastSyncedAt: null, inProgress: false });
   assert.match(html, /Never/);
   assert.match(html, /unavailable/);
+  assert.match(html, /Source: <span>Not configured<\/span>/);
+  assert.match(html, />Choose Lore Folder</);
+});
+
+test('expanded overlay shows only the bounded source basename and can be collapsed', () => {
+  const html = overlay.buildDesktopOverlayHTML({
+    available: true,
+    commit: 'abc1234',
+    recordCount: 130,
+    sourceConfigured: true,
+    sourceName: 'toadaid.github.io',
+  }, { expanded: true });
+  assert.match(html, /data-expanded="true"/);
+  assert.doesNotMatch(html, /data-toadaid-details hidden/);
+  assert.match(html, /Source: <span>toadaid\.github\.io<\/span>/);
+  assert.match(html, />Change Lore Folder</);
+  assert.match(html, /data-toadaid-action="collapse"/);
+  assert.doesNotMatch(html, /\/home\/|[A-Z]:\\/, 'must not display a filesystem path');
 });
 
 test('#2 overlay shows an in-progress (disabled) state while syncing', () => {
@@ -79,6 +100,96 @@ test('#18/#19 the preload exposes exactly DESKTOP_METHODS and no forbidden APIs'
   }
   // No generic command runner / arbitrary IPC forwarding.
   assert.doesNotMatch(preload, /runCommand|invoke\(\s*[a-z_]\w*\s*\+|ipcRenderer\.send\b/);
+  assert.doesNotMatch(preload, /window\.toadaidDesktop/, 'trusted overlay must not route back through the main-world exposure');
+  assert.match(preload, /createDesktopOverlayController\(bridge, updateOverlay\)/);
+  assert.match(preload, /nodeIntegration:\s*false|contextIsolation:\s*true/);
+});
+
+test('trusted overlay Sync Lore action calls the local bridge exactly once', async () => {
+  let syncCalls = 0;
+  const bridge = {
+    syncLore: async () => { syncCalls += 1; return { kind: 'success' }; },
+    getStatus: async () => ({}),
+    chooseCanonicalRepo: async () => null,
+    onStatusUpdate: () => () => {},
+  };
+  const controller = overlay.createDesktopOverlayController(bridge, () => {});
+  await controller.syncLore();
+  assert.equal(syncCalls, 1);
+});
+
+test('refreshStatus and status subscription use the local trusted bridge', async () => {
+  let getStatusCalls = 0;
+  let subscriptionCalls = 0;
+  let listener;
+  const updates = [];
+  const status = { available: true, commit: 'abc1234' };
+  const bridge = {
+    syncLore: async () => ({}),
+    getStatus: async () => { getStatusCalls += 1; return status; },
+    chooseCanonicalRepo: async () => null,
+    onStatusUpdate: (callback) => { subscriptionCalls += 1; listener = callback; return () => {}; },
+  };
+  const controller = overlay.createDesktopOverlayController(bridge, (value) => updates.push(value));
+  assert.equal(await controller.refreshStatus(), status);
+  assert.equal(getStatusCalls, 1);
+  controller.subscribe();
+  assert.equal(subscriptionCalls, 1);
+  listener({ available: false });
+  assert.deepEqual(updates, [status, { available: false }]);
+});
+
+test('folder cancellation does not refresh or sync; selection refreshes without syncing', async () => {
+  let chooseResult = null;
+  let chooseCalls = 0;
+  let getStatusCalls = 0;
+  let syncCalls = 0;
+  const bridge = {
+    syncLore: async () => { syncCalls += 1; },
+    getStatus: async () => { getStatusCalls += 1; return { sourceConfigured: true, sourceName: 'toadaid.github.io' }; },
+    chooseCanonicalRepo: async () => { chooseCalls += 1; return chooseResult; },
+    onStatusUpdate: () => () => {},
+  };
+  const controller = overlay.createDesktopOverlayController(bridge, () => {});
+  assert.equal(await controller.chooseCanonicalRepo(), null);
+  assert.equal(getStatusCalls, 0);
+  assert.equal(syncCalls, 0);
+  chooseResult = true;
+  assert.equal(await controller.chooseCanonicalRepo(), true);
+  assert.equal(chooseCalls, 2);
+  assert.equal(getStatusCalls, 1);
+  assert.equal(syncCalls, 0);
+});
+
+test('preload chrome is fixed, bounded, collapsible, and wraps status errors', async () => {
+  const preload = await readFile(join(__dirname, 'preload.cjs'), 'utf8');
+  assert.match(preload, /position:fixed/);
+  assert.match(preload, /width:260px/);
+  assert.match(preload, /max-width:min\(272px,calc\(100vw - 24px\)\)/);
+  assert.match(preload, /overflow-wrap:anywhere/);
+  assert.match(preload, /panelState = \{ expanded: false/);
+  assert.doesNotMatch(preload, /position:fixed[^;]*;[^\n]*(?:width:100vw|height:100vh)/);
+});
+
+test('native folder picker is bounded and persists only after a successful selection', async () => {
+  const main = await readFile(join(__dirname, 'main.mjs'), 'utf8');
+  const start = main.indexOf("ipcMain.handle('desktop:choose-repo'");
+  const end = main.indexOf("ipcMain.handle('desktop:sync-lore'", start);
+  assert.ok(start >= 0 && end > start);
+  const handler = main.slice(start, end);
+  assert.match(handler, /properties: \['openDirectory'\]/);
+  assert.match(handler, /result\.canceled[^\n]+return null/);
+  assert.match(handler, /settingsStore\.setCanonicalRepoPath\(selected\)/);
+  assert.match(handler, /pushStatus\(service\)/);
+  assert.match(handler, /return true/);
+  assert.doesNotMatch(handler, /service\.syncLore|return selected/);
+});
+
+test('Canonical Archive is cover-local lower-left on desktop and mobile-safe', async () => {
+  const css = await readFile(join(REPO_ROOT, 'src', 'styles', 'pond-archive.css'), 'utf8');
+  assert.match(css, /\.archive-cover > \.source-note \{ position: absolute; left: clamp\(1\.25rem, 2vw, 2rem\); bottom: clamp\(1\.25rem, 2vw, 2rem\)/);
+  assert.match(css, /\.archive-cover > \.cover-footnote \{ position: absolute; right: clamp\(1\.5rem, 4vw, 4rem\); bottom: clamp\(1\.25rem, 2vw, 2rem\)/, 'archive footnote wins the cover-child positioning rule and shares the true bottom edge band');
+  assert.match(css, /@media \(max-width: 640px\)[\s\S]*\.archive-cover > \.source-note \{ position: relative; left: auto; bottom: auto;/);
 });
 
 test('renderStatusMessage surfaces success/refusal/build-failure without false claims', () => {
