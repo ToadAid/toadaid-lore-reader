@@ -24,6 +24,7 @@
 
 import { readDesktopLoreStatus, shortCommit } from './desktop-status.mjs';
 import { runCanonicalSync, runReaderBuild } from './native-sync.mjs';
+import { basename } from 'node:path';
 
 /**
  * @param {object} opts
@@ -61,6 +62,7 @@ export function createDesktopLoreSyncService(opts) {
   /** Current status for the overlay (§11/§27). */
   function getStatus() {
     const gen = readDesktopLoreStatus(generatedDir);
+    const canonicalRepoPath = settingsStore ? settingsStore.getCanonicalRepoPath() : '';
     return {
       available: gen.available,
       commit: gen.commit,
@@ -69,6 +71,8 @@ export function createDesktopLoreSyncService(opts) {
       generation: shortCommit(gen),
       lastSyncedAt,
       inProgress: inFlight,
+      sourceConfigured: canonicalRepoPath.length > 0,
+      sourceName: canonicalRepoPath ? basename(canonicalRepoPath) : null,
     };
   }
 

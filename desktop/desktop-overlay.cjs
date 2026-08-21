@@ -43,19 +43,22 @@ function escapeHtml(value) {
 
 /**
  * Render the small, visually restrained desktop shell chrome as an HTML
- * string. The preload inserts it into the Reader page. Matches the §11
- * preferred presentation:
+ * string. The preload inserts it into the Reader page. It is collapsed by
+ * default and expands in place without affecting Reader layout.
  *
- *   Lore
+ *   Lore Sync
+ *   Source: <bounded repository basename or Not configured>
  *   Last synced: <local date/time or Never>
  *   Generation: <short SHA or unavailable>
+ *   [ Choose/Change Lore Folder ]
  *   [ Sync Lore ]
  *
  * @param {object} status Result of readDesktopLoreStatus plus an optional
  *   `lastSyncedAt` ISO string and an `inProgress` flag.
  */
-function buildDesktopOverlayHTML(status) {
+function buildDesktopOverlayHTML(status, options = {}) {
   const s = status || {};
+  const expanded = options.expanded === true;
   const available = s.available === true;
   const generation = available && s.commit
     ? escapeHtml(String(s.commit).slice(0, 7))
@@ -66,18 +69,53 @@ function buildDesktopOverlayHTML(status) {
   const recordLine = available && Number.isInteger(s.recordCount)
     ? `<p class="toadaid-desk-line">Records: <span>${escapeHtml(String(s.recordCount))}</span></p>`
     : '';
-  const inProgress = s.inProgress === true;
+  const inProgress = s.inProgress === true || options.syncing === true;
   const buttonState = inProgress ? 'aria-busy="true" disabled' : '';
   const buttonText = inProgress ? 'Syncing…' : 'Sync Lore';
+  const sourceConfigured = s.sourceConfigured === true;
+  const sourceName = sourceConfigured && s.sourceName
+    ? escapeHtml(String(s.sourceName))
+    : 'Not configured';
+  const chooseText = sourceConfigured ? 'Change Lore Folder' : 'Choose Lore Folder';
+  const message = options.message ? escapeHtml(String(options.message)) : '';
 
-  return `<aside class="toadaid-desk-panel" aria-label="ToadAid desktop lore sync" data-toadaid-desktop="1">
-  <p class="toadaid-desk-title">Lore</p>
-  <p class="toadaid-desk-line">Last synced: <span>${lastSynced}</span></p>
-  ${recordLine}
-  <p class="toadaid-desk-line">Generation: <code>${generation}</code></p>
-  <button type="button" class="toadaid-desk-sync" data-toadaid-action="sync-lore" ${buttonState}>${buttonText}</button>
-  <p class="toadaid-desk-message" data-toadaid-message role="status" aria-live="polite"></p>
+  return `<aside class="toadaid-desk-panel" aria-label="ToadAid desktop lore sync" data-toadaid-desktop="1" data-expanded="${expanded ? 'true' : 'false'}">
+  <button type="button" class="toadaid-desk-collapsed" data-toadaid-action="expand" aria-expanded="${expanded ? 'true' : 'false'}" ${expanded ? 'hidden' : ''}>${inProgress ? '↻ Syncing…' : '↻ Lore Sync'}</button>
+  <section class="toadaid-desk-details" data-toadaid-details ${expanded ? '' : 'hidden'}>
+    <header class="toadaid-desk-header"><strong>Lore Sync</strong><button type="button" data-toadaid-action="collapse" aria-label="Collapse Lore Sync panel">▴</button></header>
+    <p class="toadaid-desk-line">Source: <span>${sourceName}</span></p>
+    <button type="button" class="toadaid-desk-choose" data-toadaid-action="choose-repo">${chooseText}</button>
+    <p class="toadaid-desk-line">Last synced: <span>${lastSynced}</span></p>
+    ${recordLine}
+    <p class="toadaid-desk-line">Generation: <code>${generation}</code></p>
+    <button type="button" class="toadaid-desk-sync" data-toadaid-action="sync-lore" ${buttonState}>${buttonText}</button>
+    <p class="toadaid-desk-message" data-toadaid-message role="status" aria-live="polite">${message}</p>
+  </section>
 </aside>`;
+}
+
+/**
+ * Trusted preload orchestration over the already-local bridge. This controller
+ * deliberately has no `window` dependency: contextBridge exposure is for the
+ * page-facing API, while preload-owned UI calls these local methods directly.
+ */
+function createDesktopOverlayController(bridge, updateStatus) {
+  if (!bridge || typeof updateStatus !== 'function') throw new TypeError('bridge and updateStatus are required');
+  async function refreshStatus() {
+    const status = await bridge.getStatus();
+    updateStatus(status);
+    return status;
+  }
+  return {
+    syncLore: () => bridge.syncLore(),
+    refreshStatus,
+    async chooseCanonicalRepo() {
+      const selected = await bridge.chooseCanonicalRepo();
+      if (selected) await refreshStatus();
+      return selected;
+    },
+    subscribe: () => bridge.onStatusUpdate((status) => updateStatus(status)),
+  };
 }
 
 function formatLocal(iso) {
@@ -119,5 +157,6 @@ module.exports = {
   DESKTOP_METHODS,
   FORBIDDEN_EXPOSED,
   buildDesktopOverlayHTML,
+  createDesktopOverlayController,
   renderStatusMessage,
 };
