@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "CHOKIDAR_USEPOLLING=1 ASTRO_TELEMETRY_DISABLED=1 astro dev",
     "test": "node --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "build": "ASTRO_TELEMETRY_DISABLED=1 node scripts/build-reader.mjs",
     "import:canonical": "node scripts/import-canonical-lore.mjs",
     "sync:canonical": "node scripts/sync-canonical-lore.mjs",
