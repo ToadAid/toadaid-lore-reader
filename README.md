@@ -78,3 +78,14 @@ material.
 npm test
 npm run build
 ```
+
+## Public offline PWA
+
+The public Pages build is explicitly admitted as a PWA with `PUBLIC_PWA=1`.
+It creates a base-aware web manifest plus a service worker that precaches the
+complete same-origin static Reader generation. Its cache identity is derived
+from the exact Reader and canonical commits, and external historical media is
+intentionally excluded. The deterministic `public/art/pond-archive/pwa-icon-192.png`
+and `pwa-icon-512.png` installation icons are derivatives of the existing
+repository-owned `pond-archive-lotus-moon.png` artwork. Ordinary local and
+Electron builds do not register a service worker.
