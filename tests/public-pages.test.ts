@@ -175,10 +175,14 @@ test('offline cache identity requires both exact generation SHAs without time or
 
 test('cover is timeless while verified record count remains derived archive state', () => {
   const cover = readFileSync(resolve(REPO, 'src/pages/index.astro'), 'utf8');
+  const chronicle = readFileSync(resolve(REPO, 'src/pages/chronicle/index.astro'), 'utf8');
   const state = readFileSync(resolve(REPO, 'src/lib/lore/archive-cover-state.ts'), 'utf8');
   assert.match(cover, />Verified canonical archive</);
   assert.doesNotMatch(cover, /records preserved/);
   assert.match(cover, /canonicalCommit\.slice\(0, 9\)/);
+  assert.match(chronicle, />Canonical lore, ordered by archive chronology marker\.<\/p>/);
+  assert.doesNotMatch(chronicle, /archive\.provenance\.recordCount/);
+  assert.doesNotMatch(chronicle, /\d+ canonical records/);
   assert.match(state, /recordCount/);
 });
 
