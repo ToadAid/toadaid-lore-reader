@@ -297,9 +297,9 @@ export function validateHistoricalArtifact(input: unknown): HistoricalArtifact {
   };
   if (a.archivePath !== undefined) result.archivePath = a.archivePath;
   if (a.expectedSha256 !== undefined) result.expectedSha256 = a.expectedSha256;
-  if (a.attribution !== undefined) result.attribution = a.attribution;
-  if (a.alt !== undefined) result.alt = a.alt;
-  if (a.caption !== undefined) result.caption = a.caption;
+  if (typeof a.attribution === 'string') result.attribution = a.attribution;
+  if (typeof a.alt === 'string') result.alt = a.alt;
+  if (typeof a.caption === 'string') result.caption = a.caption;
   return result;
 }
 

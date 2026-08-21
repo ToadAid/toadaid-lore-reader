@@ -37,6 +37,26 @@ test('a valid explicitly-authored artifact ID is accepted', () => {
   assert.equal(isValidArtifactId(GOOD_ID), true);
 });
 
+test('optional authored artifact strings are copied exactly and invalid present values are refused', () => {
+  const a = validateHistoricalArtifact({
+    ...base(),
+    attribution: 'ToadAid archive',
+    alt: 'Moonlit pond',
+    caption: 'A quiet historical artifact',
+  });
+  assert.equal(a.attribution, 'ToadAid archive');
+  assert.equal(a.alt, 'Moonlit pond');
+  assert.equal(a.caption, 'A quiet historical artifact');
+
+  for (const field of ['attribution', 'alt', 'caption']) {
+    refuse({ ...base(), [field]: null }, new RegExp(field));
+    refuse({ ...base(), [field]: 42 }, new RegExp(field));
+    refuse({ ...base(), [field]: true }, new RegExp(field));
+    refuse({ ...base(), [field]: {} }, new RegExp(field));
+    refuse({ ...base(), [field]: [] }, new RegExp(field));
+  }
+});
+
 // 2. malformed artifact ID rejected
 test('malformed artifact IDs are rejected', () => {
   for (const badId of [
