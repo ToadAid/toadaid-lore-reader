@@ -2,7 +2,7 @@
 import { packager } from '@electron/packager';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { validateDesktopPayload } from './validate-desktop-package.mjs';
+import { validateDesktopPayload, validateDesktopPackage } from './validate-desktop-package.mjs';
 
 const ROOT = resolve('.');
 const RELEASE = resolve(ROOT, 'release');
@@ -11,6 +11,13 @@ const PRODUCT = 'The Pond Archive';
 const RUNTIME_FILES = ['desktop/packaged-main.mjs', 'desktop/static-reader-host.mjs', 'desktop/navigation-policy.mjs', 'desktop/single-instance.mjs'];
 
 function fail(message) { throw new Error(`Desktop packaging refused: ${message}`); }
+export function packageTarget(argv) {
+  const args = Object.fromEntries(argv.map((value, index) => index % 2 === 0 ? [value, argv[index + 1]] : null).filter(Boolean));
+  const platform = args['--platform'];
+  const arch = args['--arch'];
+  if (!['linux', 'win32'].includes(platform) || arch !== 'x64') fail(`supported targets are linux/x64 and win32/x64; received ${platform}/${arch}`);
+  return { platform, arch };
+}
 function hostIsLinuxX64() { return process.platform === 'linux' && process.arch === 'x64'; }
 function electronVersion() { return JSON.parse(readFileSync(resolve(ROOT, 'node_modules/electron/package.json'), 'utf8')).version; }
 export function stagePackagedApp({ root = ROOT, release = RELEASE, dist = DIST } = {}) {
@@ -28,17 +35,17 @@ export function stagePackagedApp({ root = ROOT, release = RELEASE, dist = DIST }
   return stage;
 }
 async function main() {
-  if (!hostIsLinuxX64()) fail(`Linux x64 packaging requires linux/x64, received ${process.platform}/${process.arch}`);
+  if (!hostIsLinuxX64()) fail(`portable packaging host requires linux/x64, received ${process.platform}/${process.arch}`);
+  const { platform, arch } = packageTarget(process.argv.slice(2));
   if (process.env.PUBLIC_PWA === '1') fail('packaged runtime requires the ordinary non-PWA Reader build');
   mkdirSync(RELEASE, { recursive: true });
   const stage = stagePackagedApp();
-  const output = join(RELEASE, `${PRODUCT}-linux-x64`);
+  const output = join(RELEASE, `${PRODUCT}-${platform}-${arch}`);
   rmSync(output, { recursive: true, force: true });
   try {
-    await packager({ dir: stage, out: RELEASE, name: PRODUCT, platform: 'linux', arch: 'x64', electronVersion: electronVersion(), overwrite: true, prune: true, asar: false });
-    const appDirectory = join(output, 'resources', 'app');
-    const result = validateDesktopPayload(appDirectory);
-    console.log(`DESKTOP_PACKAGE_OK path=${output} payload_files=${result.files} records=${result.records} electron=${electronVersion()}`);
+    await packager({ dir: stage, out: RELEASE, name: PRODUCT, platform, arch, electronVersion: electronVersion(), overwrite: true, prune: true, asar: false });
+    const result = validateDesktopPackage({ packageDirectory: output, platform, arch });
+    console.log(`DESKTOP_PACKAGE_OK target=${platform}/${arch} path=${output} payload_files=${result.files} records=${result.records} electron=${electronVersion()}`);
   } finally { rmSync(stage, { recursive: true, force: true }); }
 }
 if (import.meta.url === `file://${process.argv[1]}`) main().catch((error) => { console.error(error.message); process.exitCode = 1; });

@@ -38,6 +38,7 @@
 ## Desktop Distribution
 
 - [x] Packaged read-only Linux x64 runtime (Stage 2A-DESK2-P1): `npm run desktop:package:linux` stages only the built non-PWA Reader plus the minimal Electron host/navigation/single-instance modules, then produces a disposable portable application under `release/`. This end-user mode has no sync overlay, repository chooser, preload, IPC, canonical Git/source, or Node/npm/source-checkout dependency.
+- [x] Windows x64 portable packaged Reader (Stage 2A-DESK2-P2): the same shared staging/runtime path can cross-package an unsigned `win32/x64` portable directory with `npm run desktop:package:windows`. Windows live dogfood remains pending; code signing is not performed and SmartScreen trust is not claimed. macOS remains future work.
 
 ## P4 — Interactive Study
 
