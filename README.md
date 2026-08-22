@@ -1,7 +1,16 @@
 # ToadAid Lore Reader
 
-Static reader foundation for the historical lore archive. This repository is a
-generated consumer, not an independently authored lore archive.
+**The Pond Archive** — a public reader for the historical Tobyworld lore archive.
+
+Read the lore: https://toadaid.github.io/toadaid-lore-reader/
+
+The public web Reader is installable as an offline-capable PWA. The Linux x64
+portable desktop Reader has passed live acceptance; Windows x64 and macOS x64 /
+arm64 portable builds are structurally validated and remain pending live testing
+on their target platforms.
+
+This repository is a generated consumer, not an independently authored lore
+archive.
 
 ## Canonical source
 
@@ -75,6 +84,7 @@ material.
 ## Local commands
 
 ```sh
+npm run typecheck
 npm test
 npm run build
 ```
@@ -104,6 +114,11 @@ npm run desktop:package:linux
 The disposable `release/The Pond Archive-linux-x64/` directory is an
 end-user Reader only: it contains the verified static generation and no lore
 sync control, canonical checkout, Node/npm requirement, or PWA runtime.
+
+The current Linux x64 packaged Reader has passed live acceptance, including
+normal launch and navigation, Bookmarks, external-link routing to the system
+browser, offline relaunch, reading a previously unvisited lore record offline,
+and normal shutdown.
 
 ## Windows portable offline Reader
 
